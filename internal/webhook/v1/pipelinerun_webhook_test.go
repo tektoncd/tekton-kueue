@@ -327,6 +327,27 @@ var _ = Describe("PipelineRun Webhook", func() {
 					MatchError(ContainSubstring("CEL evaluation failed"))))
 		})
 
+		It("CEL managedBy should override config-level multiKueueOverride", func(ctx context.Context) {
+			programs, err := cel.CompileCELPrograms([]string{`managedBy("my-custom-controller")`})
+			Expect(err).NotTo(HaveOccurred())
+
+			cfg := &config.Config{
+				QueueName:          "test-queue",
+				MultiKueueOverride: true,
+			}
+			cfgStore := &ConfigStore{
+				config:   cfg,
+				mutators: []PipelineRunMutator{cel.NewCELMutator(programs)},
+			}
+
+			defaulter, err = NewCustomDefaulter(cfgStore)
+			Expect(err).NotTo(HaveOccurred())
+			err = defaulter.Default(ctx, plr)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(*plr.Spec.ManagedBy).To(Equal("my-custom-controller"),
+				"CEL managedBy() should override the config-level multiKueueOverride value")
+		})
+
 		It("should reject a non-pipelinerun object", func(ctx context.Context) {
 			cfg := &config.Config{
 				QueueName: "test-queue",
@@ -459,9 +480,34 @@ var _ = Describe("Zero-value field leak (issue #319)", func() {
 		}
 	})
 
-	// This Test validates the case when PipelineRun Contains all the fields and Webhook is not expected to apply Any patch.
-	// In Such Scenario Handler webhook should set the Patch and PatchType to Nil
-	// Both these values should be sync otherwise Kubernetes will not be able to process the PipelineRun.
+	It("patchFilteringWebhook allows /spec/managedBy patches from CEL managedBy()", func(ctx context.Context) {
+		programs, err := cel.CompileCELPrograms([]string{`managedBy("custom-controller.io")`})
+		Expect(err).NotTo(HaveOccurred())
+
+		cfgStore = &ConfigStore{
+			config:   &config.Config{QueueName: "test-queue"},
+			mutators: []PipelineRunMutator{cel.NewCELMutator(programs)},
+		}
+
+		defaulter, err := NewCustomDefaulter(cfgStore)
+		Expect(err).NotTo(HaveOccurred())
+
+		inner := admission.WithCustomDefaulter(scheme, &tektondevv1.PipelineRun{}, defaulter)
+		filtered := &patchFilteringWebhook{inner: inner}
+
+		resp := filtered.Handle(ctx, makeAdmissionRequest(minimalPipelineRunJSON))
+		Expect(resp.Allowed).To(BeTrue())
+
+		hasManagedByPatch := false
+		for _, p := range resp.Patches {
+			if strings.Contains(p.Path, "managedBy") {
+				hasManagedByPatch = true
+			}
+		}
+		Expect(hasManagedByPatch).To(BeTrue(),
+			"expected /spec/managedBy patch to survive the patch filter")
+	})
+
 	It("patchFilteringWebhook sets Patch and PatchType to nil when there is nothing to patch", func(ctx context.Context) {
 		defaulter, err := NewCustomDefaulter(cfgStore)
 		Expect(err).NotTo(HaveOccurred())

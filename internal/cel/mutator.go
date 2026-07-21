@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/konflux-ci/tekton-kueue/pkg/common"
 	tekv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	"k8s.io/utils/ptr"
 )
 
 // CELMutator applies mutations to PipelineRun objects based on compiled CEL programs.
@@ -161,6 +163,16 @@ func mutate(pipelineRun *tekv1.PipelineRun, mutation *MutationRequest) (*tekv1.P
 
 		// Store the summed value back as string
 		pipelineRun.Annotations[mutation.Key] = strconv.Itoa(newValue)
+	case MutationTypeManagedBy:
+		pipelineRun.Spec.ManagedBy = ptr.To(mutation.Value)
+	case MutationTypeMultiKueue:
+		pipelineRun.Spec.ManagedBy = ptr.To(common.ManagedByMultiKueueLabel)
+		if mutation.Value != "" {
+			if pipelineRun.Labels == nil {
+				pipelineRun.Labels = make(map[string]string)
+			}
+			pipelineRun.Labels[common.QueueLabel] = mutation.Value
+		}
 	}
 	return pipelineRun, nil
 }

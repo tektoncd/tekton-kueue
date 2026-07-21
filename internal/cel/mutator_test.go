@@ -8,6 +8,7 @@ import (
 	. "github.com/onsi/gomega"
 	tekv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 // Common test constants to reduce duplication
@@ -785,6 +786,102 @@ func TestCELMutator_Mutate(t *testing.T) {
 			},
 			expectErr: false,
 		},
+		{
+			name: "managedBy with custom value",
+			expressions: []string{
+				`managedBy("my-custom-controller.io")`,
+			},
+			initialLabels:       nil,
+			initialAnnotations:  nil,
+			expectedLabels:      nil,
+			expectedAnnotations: nil,
+			expectErr:           false,
+		},
+		{
+			name: "multiKueue zero-arg sets managedBy",
+			expressions: []string{
+				`multiKueue()`,
+			},
+			initialLabels:       nil,
+			initialAnnotations:  nil,
+			expectedLabels:      nil,
+			expectedAnnotations: nil,
+			expectErr:           false,
+		},
+		{
+			name: "multiKueue with queue name sets managedBy and queue label",
+			expressions: []string{
+				`multiKueue("mk-queue")`,
+			},
+			initialLabels:      nil,
+			initialAnnotations: nil,
+			expectedLabels: map[string]string{
+				"kueue.x-k8s.io/queue-name": "mk-queue",
+			},
+			expectedAnnotations: nil,
+			expectErr:           false,
+		},
+		{
+			name: "multiKueue combined with other mutations",
+			expressions: []string{
+				`[multiKueue(), resource("cpu", 2)]`,
+			},
+			initialLabels:      nil,
+			initialAnnotations: nil,
+			expectedLabels:     nil,
+			expectedAnnotations: map[string]string{
+				"kueue.konflux-ci.dev/requests-cpu": "2",
+			},
+			expectErr: false,
+		},
+		{
+			name: "conditional multiKueue - build event routes to multikueue",
+			expressions: []string{
+				`pacEventType == "build" ? multiKueue() : annotation("routing", "hub")`,
+			},
+			initialLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "build",
+			},
+			initialAnnotations: nil,
+			expectedLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "build",
+			},
+			expectedAnnotations: nil,
+			expectErr:           false,
+		},
+		{
+			name: "conditional multiKueue - release event stays on hub",
+			expressions: []string{
+				`pacEventType == "build" ? multiKueue() : annotation("routing", "hub")`,
+			},
+			initialLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "release",
+			},
+			initialAnnotations: nil,
+			expectedLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "release",
+			},
+			expectedAnnotations: map[string]string{
+				"routing": "hub",
+			},
+			expectErr: false,
+		},
+		{
+			name: "conditional multiKueue with queue override",
+			expressions: []string{
+				`pacEventType == "build" ? multiKueue("mk-queue") : annotation("routing", "hub")`,
+			},
+			initialLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "build",
+			},
+			initialAnnotations: nil,
+			expectedLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "build",
+				"kueue.x-k8s.io/queue-name":             "mk-queue",
+			},
+			expectedAnnotations: nil,
+			expectErr:           false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -847,6 +944,112 @@ func TestCELMutator_Mutate(t *testing.T) {
 
 			// Verify annotations
 			g.Expect(pipelineRun.Annotations).To(Equal(tt.expectedAnnotations))
+		})
+	}
+}
+
+func TestCELMutator_Mutate_ManagedBy(t *testing.T) {
+	tests := []struct {
+		name                string
+		expressions         []string
+		initialLabels       map[string]string
+		expectedManagedBy   *string
+		expectedLabels      map[string]string
+		expectedAnnotations map[string]string
+	}{
+		{
+			name:              "managedBy sets Spec.ManagedBy",
+			expressions:       []string{`managedBy("my-custom-controller.io")`},
+			expectedManagedBy: ptr.To("my-custom-controller.io"),
+		},
+		{
+			name:              "multiKueue sets Spec.ManagedBy to multikueue value",
+			expressions:       []string{`multiKueue()`},
+			expectedManagedBy: ptr.To("kueue.x-k8s.io/multikueue"),
+		},
+		{
+			name:              "multiKueue with queue sets both managedBy and queue label",
+			expressions:       []string{`multiKueue("mk-queue")`},
+			expectedManagedBy: ptr.To("kueue.x-k8s.io/multikueue"),
+			expectedLabels: map[string]string{
+				"kueue.x-k8s.io/queue-name": "mk-queue",
+			},
+		},
+		{
+			name:        "conditional multiKueue - true branch sets managedBy",
+			expressions: []string{`pacEventType == "build" ? multiKueue() : annotation("routing", "hub")`},
+			initialLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "build",
+			},
+			expectedManagedBy: ptr.To("kueue.x-k8s.io/multikueue"),
+		},
+		{
+			name:        "conditional multiKueue - false branch does not set managedBy",
+			expressions: []string{`pacEventType == "build" ? multiKueue() : annotation("routing", "hub")`},
+			initialLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "release",
+			},
+			expectedManagedBy: nil,
+			expectedAnnotations: map[string]string{
+				"routing": "hub",
+			},
+		},
+		{
+			name:              "multiKueue combined with other mutations",
+			expressions:       []string{`[multiKueue(), resource("cpu", 2)]`},
+			expectedManagedBy: ptr.To("kueue.x-k8s.io/multikueue"),
+			expectedAnnotations: map[string]string{
+				"kueue.konflux-ci.dev/requests-cpu": "2",
+			},
+		},
+		{
+			name:        "conditional multiKueue with queue - true branch",
+			expressions: []string{`pacEventType == "build" ? multiKueue("mk-queue") : annotation("routing", "hub")`},
+			initialLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "build",
+			},
+			expectedManagedBy: ptr.To("kueue.x-k8s.io/multikueue"),
+			expectedLabels: map[string]string{
+				"pipelinesascode.tekton.dev/event-type": "build",
+				"kueue.x-k8s.io/queue-name":             "mk-queue",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := NewWithT(t)
+
+			pipelineRun := &tekv1.PipelineRun{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-pipeline",
+					Namespace: "test-namespace",
+					Labels:    maps.Clone(tt.initialLabels),
+				},
+				Spec: tekv1.PipelineRunSpec{
+					PipelineRef: &tekv1.PipelineRef{Name: "test-pipeline"},
+				},
+			}
+
+			programs, err := CompileCELPrograms(tt.expressions)
+			g.Expect(err).NotTo(HaveOccurred())
+
+			mutator := NewCELMutator(programs)
+			g.Expect(mutator.Mutate(pipelineRun)).To(Succeed())
+
+			if tt.expectedManagedBy != nil {
+				g.Expect(pipelineRun.Spec.ManagedBy).NotTo(BeNil())
+				g.Expect(*pipelineRun.Spec.ManagedBy).To(Equal(*tt.expectedManagedBy))
+			} else {
+				g.Expect(pipelineRun.Spec.ManagedBy).To(BeNil())
+			}
+
+			if tt.expectedLabels != nil {
+				g.Expect(pipelineRun.Labels).To(Equal(tt.expectedLabels))
+			}
+			if tt.expectedAnnotations != nil {
+				g.Expect(pipelineRun.Annotations).To(Equal(tt.expectedAnnotations))
+			}
 		})
 	}
 }

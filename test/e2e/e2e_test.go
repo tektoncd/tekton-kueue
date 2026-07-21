@@ -648,6 +648,43 @@ var _ = Describe("Manager", Ordered, func() {
 
 	})
 
+	Context("CEL managedBy sets Spec.ManagedBy", Ordered, Label("config", "smoke"), func() {
+		managedByValue := "test-controller.example.io"
+		kueueConfig := config.Config{
+			QueueName: "local-queue",
+			CEL: config.CEL{
+				Expressions: []string{
+					fmt.Sprintf(`managedBy("%s")`, managedByValue),
+				},
+			},
+		}
+
+		cfgMap := &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      common.ConfigMapName,
+				Namespace: "tekton-kueue",
+			},
+			Data: map[string]string{},
+		}
+
+		It("should set ManagedBy on created PipelineRun", func(ctx context.Context) {
+			cfgMapData, err := yaml.Marshal(kueueConfig)
+			Expect(err).ToNot(HaveOccurred())
+
+			cfgMap.Data[common.ConfigKey] = string(cfgMapData)
+
+			err = k8sClient.Update(ctx, cfgMap)
+			Expect(err).NotTo(HaveOccurred())
+
+			Eventually(func() *string {
+				plr := plrTemplate.DeepCopy()
+				err = k8sClient.Create(ctx, plr)
+				Expect(err).NotTo(HaveOccurred())
+				return plr.Spec.ManagedBy
+			}).WithTimeout(time.Duration(30) * time.Second).Should(HaveValue(Equal(managedByValue)))
+		})
+	})
+
 	Context("Ignore Config when ConfigMap is updated with invalid Values", Ordered, Label("config", "smoke"), func() {
 		queueName := "my-ignored-queue"
 		kueueConfig := config.Config{

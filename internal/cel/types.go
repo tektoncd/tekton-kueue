@@ -14,6 +14,8 @@ const (
 	MutationTypeAnnotation MutationType = "annotation"
 	MutationTypeLabel      MutationType = "label"
 	MutationTypeResource   MutationType = "resource"
+	MutationTypeManagedBy  MutationType = "managedBy"
+	MutationTypeMultiKueue MutationType = "multiKueue"
 )
 
 // IsValid checks if the mutation type is valid
@@ -28,7 +30,7 @@ func (mt MutationType) String() string {
 
 // ValidTypes returns all valid mutation types
 func ValidTypes() []MutationType {
-	return []MutationType{MutationTypeAnnotation, MutationTypeLabel, MutationTypeResource}
+	return []MutationType{MutationTypeAnnotation, MutationTypeLabel, MutationTypeResource, MutationTypeManagedBy, MutationTypeMultiKueue}
 }
 
 // UnmarshalJSON implements json.Unmarshaler interface with validation
@@ -67,8 +69,11 @@ func (mr *MutationRequest) Validate() error {
 	if mr.Key == "" {
 		return fmt.Errorf("mutation key cannot be empty")
 	}
-	if mr.Value == "" {
+	if mr.Value == "" && mr.Type != MutationTypeMultiKueue {
 		return fmt.Errorf("mutation value cannot be empty")
+	}
+	if mr.Type == MutationTypeManagedBy && mr.Key != "managedBy" {
+		return fmt.Errorf("managedBy mutation must use key %q, got %q", "managedBy", mr.Key)
 	}
 	return nil
 }

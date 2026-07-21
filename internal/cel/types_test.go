@@ -16,6 +16,8 @@ func TestMutationType_IsValid(t *testing.T) {
 		{"valid annotation", MutationTypeAnnotation, true},
 		{"valid label", MutationTypeLabel, true},
 		{"valid resource", MutationTypeResource, true},
+		{"valid managedBy", MutationTypeManagedBy, true},
+		{"valid multiKueue", MutationTypeMultiKueue, true},
 		{"invalid type", MutationType("invalid"), false},
 		{"empty type", MutationType(""), false},
 	}
@@ -53,6 +55,18 @@ func TestMutationType_JSON(t *testing.T) {
 			input:     `"resource"`,
 			expectErr: false,
 			expected:  MutationTypeResource,
+		},
+		{
+			name:      "valid managedBy",
+			input:     `"managedBy"`,
+			expectErr: false,
+			expected:  MutationTypeManagedBy,
+		},
+		{
+			name:      "valid multiKueue",
+			input:     `"multiKueue"`,
+			expectErr: false,
+			expected:  MutationTypeMultiKueue,
 		},
 		{
 			name:      "invalid type",
@@ -141,6 +155,43 @@ func TestMutationRequest_Validate(t *testing.T) {
 			},
 			expectErr: true,
 			errMsg:    "mutation value cannot be empty",
+		},
+		{
+			name: "valid managedBy",
+			request: MutationRequest{
+				Type:  MutationTypeManagedBy,
+				Key:   "managedBy",
+				Value: "custom-controller.io",
+			},
+			expectErr: false,
+		},
+		{
+			name: "managedBy with wrong key",
+			request: MutationRequest{
+				Type:  MutationTypeManagedBy,
+				Key:   "wrong-key",
+				Value: "custom-controller.io",
+			},
+			expectErr: true,
+			errMsg:    "managedBy mutation must use key",
+		},
+		{
+			name: "valid multiKueue with queue",
+			request: MutationRequest{
+				Type:  MutationTypeMultiKueue,
+				Key:   "managedBy",
+				Value: "my-queue",
+			},
+			expectErr: false,
+		},
+		{
+			name: "valid multiKueue without queue",
+			request: MutationRequest{
+				Type:  MutationTypeMultiKueue,
+				Key:   "managedBy",
+				Value: "",
+			},
+			expectErr: false,
 		},
 	}
 
