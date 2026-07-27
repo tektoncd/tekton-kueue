@@ -3,7 +3,7 @@ module github.com/konflux-ci/tekton-kueue
 go 1.25.3
 
 require (
-	github.com/go-logr/logr v1.4.3
+	github.com/go-logr/logr v1.4.4
 	github.com/google/cel-go v0.27.0
 	github.com/onsi/ginkgo/v2 v2.27.5
 	github.com/onsi/gomega v1.39.0
