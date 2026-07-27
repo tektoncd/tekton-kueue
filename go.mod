@@ -26,7 +26,7 @@ require (
 replace github.com/google/cel-go => github.com/google/cel-go v0.22.0
 
 require (
-	cel.dev/expr v0.25.1 // indirect
+	cel.dev/expr v0.25.2 // indirect
 	contrib.go.opencensus.io/exporter/ocagent v0.7.1-0.20230502190836-7399e0f8ee5e // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
