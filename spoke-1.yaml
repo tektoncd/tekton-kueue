@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  # The name MUST start with "spoke-kubeconfig-" to pass your Predicate filter
+  name: spoke-kubeconfig-spoke-cluster
+  # The namespace MUST be "default" to pass your Predicate filter
+  namespace: default
+type: Opaque
+stringData:
+  # The key must be "kubeconfig" for your reconciler to parse it
+  kubeconfig: |
+    apiVersion: v1
+    kind: Config
+    clusters:
+    - cluster:
+        certificate-authority-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg== 
+        server: https://192.168.1.100:6443
+      name: dev-cluster
+    contexts:
+    - context:
+        cluster: dev-cluster
+        user: kubernetes-admin
+      name: kubernetes-admin@dev-cluster
+    current-context: kubernetes-admin@dev-cluster
+    users:
+    - name: kubernetes-admin
+      user:
+        client-certificate-data: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCg==
+        client-key-data: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQo=

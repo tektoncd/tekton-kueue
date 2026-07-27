@@ -1,8 +1,8 @@
 kind: Kustomization
 images:
 - name: controller
-  newName: konflux-ci/tekton-kueue
-  newTag: latest
+  newName: quay.io/prbindal/tekton-kueue
+  newTag: 37-41
 resources:
 - deployment.yaml
 - manifests.yaml

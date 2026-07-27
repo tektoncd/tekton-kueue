@@ -139,7 +139,7 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
 .PHONY: release
-release: kustomize
+release: kustomize manifests generate
 	mkdir -p ${RELEASE_DIR}
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	cd config/webhook && $(KUSTOMIZE) edit set image controller=${IMG}
@@ -269,6 +269,6 @@ load-image: docker-build
 
 # Apply tekton config  with all its dependencies.
 .PHONY: apply
-apply: docker-build docker-push release
+apply: docker-buildx release
 	$(KUBECTL) apply --server-side -f ${RELEASE_DIR}/release-${VERSION}.yaml
 	$(KUBECTL) wait --for=condition=Available deployment --all -n tekton-kueue --timeout=300s

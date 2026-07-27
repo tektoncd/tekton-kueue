@@ -1,0 +1,17 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: multikueue-sa-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "secrets"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: ["kueue.x-k8s.io"]
+    resources: ["workloads", "workloads/status"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  - apiGroups: ["tekton.dev"]
+    resources: ["pipelineruns", "pipelineruns/status","taskruns", "taskruns/status"]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]

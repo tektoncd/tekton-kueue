@@ -264,6 +264,7 @@ func runController(args []string) {
 
 	addMetricsCertWatcher(mgr, metricsCertWatcher)
 	addReadyAndHealthChecksToMgrOrDie(mgr)
+	addMultiKueueReconciler(mgr)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctx); err != nil {
@@ -543,6 +544,19 @@ func addConfigWatcher(mgr ctrl.Manager, configStore *webhookv1.ConfigStore) {
 		os.Exit(1)
 	}
 }
+
+func addMultiKueueReconciler(mgr ctrl.Manager) {
+	reconciler := &controller.MultiKueueReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}
+
+	if err := reconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "SpokeCredential")
+		os.Exit(1)
+	}
+}
+
 func parseFlagsOrDie(fs *flag.FlagSet, args []string) {
 	if err := fs.Parse(args); err != nil {
 		setupLog.Error(err, "Failed to parse CLI arguments")
