@@ -194,7 +194,7 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= v2.7.2
 KUEUE_VERSION ?= $(shell ./hack/get-kueue-version.sh)
-TEKTON_VERSION ?= v0.70.0
+TEKTON_VERSION ?= v1.12.2
 CERT_MANAGER_VERSION ?= v1.19.2
 
 .PHONY: kustomize
@@ -248,7 +248,7 @@ kueue:
 
 .PHONY: tekton
 tekton:
-	$(KUBECTL) apply --server-side -f https://storage.googleapis.com/tekton-releases/pipeline/previous/$(TEKTON_VERSION)/release.yaml
+	$(KUBECTL) apply --server-side -f https://github.com/tektoncd/pipeline/releases/download/$(TEKTON_VERSION)/release.yaml
 	$(KUBECTL) wait --for=condition=Available deployment --all -n tekton-pipelines --timeout=300s
 
 .PHONY: cert-manager
