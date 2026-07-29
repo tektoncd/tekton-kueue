@@ -30,7 +30,8 @@ resource-aware scheduling via admission webhook and CEL-based mutations.
 - `internal/controller/` — PipelineRun → Workload reconciler.
 - `internal/webhook/` — admission webhook with CEL mutation engine.
 - `internal/cel/` — CEL functions: `annotation()`, `label()`, `priority()`,
-  `resource()` plus convenience vars (`plrNamespace`, `pacEventType`).
+  `resource()`, `managedBy()`, `multiKueue()` plus convenience vars
+  (`plrNamespace`, `pacEventType`).
 - `pkg/` — `mutate` (CLI logic), `common` (utilities), `config` (ConfigMap).
 - `config/` — Kustomize manifests; `test/e2e/` — e2e tests.
 
@@ -39,7 +40,9 @@ resource-aware scheduling via admission webhook and CEL-based mutations.
 - Kubebuilder scaffolded — run `make manifests` and `make generate` after
   modifying API types or RBAC markers.
 - CEL `resource()` values with same key are summed; rejects negatives.
-- MultiKueue mode via `multiKueueOverride: true` in ConfigMap.
+- MultiKueue routing via CEL: `multiKueue()` or `multiKueue(queueName)` in
+  expressions. `managedBy(value)` for custom controller routing. The boolean
+  `multiKueueOverride: true` still works for backward compatibility.
 - `mutate` CLI previews webhook behavior offline — use before production.
 - Coverage instrumentation toggled via `ENABLE_COVERAGE=true`.
 - All changes via PR; review required.

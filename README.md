@@ -138,6 +138,32 @@ data:
 ```
 The controller will automatically load the configuration from this `ConfigMap`.
 
+#### CEL-Based Routing (Alternative)
+
+For conditional per-PipelineRun routing, use the CEL `multiKueue()` function instead of the boolean `multiKueueOverride`. This lets you route only specific PipelineRuns to MultiKueue based on labels, namespace, or other properties:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tekton-kueue-config
+  namespace: tekton-kueue-system
+data:
+  config.yaml: |
+    queueName: default-queue
+    cel:
+      expressions:
+        # Route build pipelines to spoke cluster via MultiKueue,
+        # keep everything else on the hub
+        - |
+          has(pipelineRun.metadata.labels) &&
+          "pipeline-type" in pipelineRun.metadata.labels &&
+          pipelineRun.metadata.labels["pipeline-type"] == "build" ?
+            [multiKueue("multikueue-queue")] : []
+```
+
+> **Note:** When using CEL routing functions (`managedBy()`, `multiKueue()`), do not set `multiKueueOverride: true`. The boolean sets `Spec.ManagedBy` for all PipelineRuns unconditionally *before* CEL expressions are evaluated, which prevents conditional per-PipelineRun routing. Use `multiKueueOverride` only when *all* PipelineRuns should be routed to MultiKueue.
+
 ## Command Line Interface
 
 The `tekton-kueue` binary provides several subcommands:
@@ -260,6 +286,25 @@ cel:
     - 'plrNamespace == "production" ? label("environment", "prod") : label("environment", "dev")'
     - 'pacEventType == "push" ? annotation("trigger", "push-event") : annotation("trigger", "other-event")'
     - 'pacTestEventType != "" ? label("test-type", pacTestEventType) : label("test-type", "none")'
+    
+    # managedBy - set Spec.ManagedBy to a custom controller (standalone example)
+    - 'managedBy("tekton.dev/pipeline")'
+    
+    # multiKueue - route to spoke cluster via MultiKueue (standalone example)
+    - 'multiKueue()'
+    
+    # multiKueue with queue - route to spoke AND override queue name (standalone example)
+    - 'multiKueue("multikueue-queue")'
+```
+
+> **Note:** `managedBy()`, `multiKueue()`, and `multiKueue("queueName")` all set `Spec.ManagedBy`. Using more than one unconditionally in the same config does not make sense — the last one silently overrides the others. Use them in conditional expressions (ternaries) for per-PipelineRun routing, or pick a single routing strategy.
+
+```yaml
+cel:
+  expressions:
+    # Conditional routing - builds to spoke, releases stay on hub
+    - 'has(pipelineRun.metadata.labels) && "pipeline-type" in pipelineRun.metadata.labels && pipelineRun.metadata.labels["pipeline-type"] == "build" ? [multiKueue("multikueue-queue")] : []'
+    - 'has(pipelineRun.metadata.labels) && "pipeline-type" in pipelineRun.metadata.labels && pipelineRun.metadata.labels["pipeline-type"] == "release" ? [managedBy("tekton.dev/pipeline")] : []'
     
     # Multiline CEL expression for multiple mutations
     # This expression applies several annotations and labels in one go

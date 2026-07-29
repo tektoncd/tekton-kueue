@@ -12,7 +12,8 @@
 //
 //   - Input: *tekton.PipelineRun (strongly typed and validated)
 //   - Output: []MutationRequest (validated structure and content)
-//   - Functions: annotation(key, value), label(key, value), and priority(value)
+//   - Functions: annotation(key, value), label(key, value), priority(value), resource(key, count),
+//     managedBy(value), multiKueue() / multiKueue(queueName), replace(source, search, replacement)
 //   - Expressions: Single mutations or lists of mutations
 //
 // # Basic Usage
@@ -74,6 +75,20 @@
 //   - priority(value: string) -> MutationRequest
 //     Creates a label mutation with key "kueue.x-k8s.io/priority-class" and the specified value
 //
+//   - managedBy(value: string) -> MutationRequest
+//     Sets the PipelineRun's Spec.ManagedBy field to the specified value.
+//     Use for custom controller routing (e.g., managedBy("tekton.dev/pipeline"))
+//
+//   - multiKueue() -> MutationRequest
+//     Sets Spec.ManagedBy to "kueue.x-k8s.io/multikueue", routing the PipelineRun
+//     to a spoke cluster via Kueue's MultiKueue dispatch
+//
+//   - multiKueue(queueName: string) -> MutationRequest
+//     Sets Spec.ManagedBy to "kueue.x-k8s.io/multikueue" AND overrides the
+//     "kueue.x-k8s.io/queue-name" label to the specified queue. Both changes
+//     are applied from a single mutation at apply time. Use when the MultiKueue
+//     queue differs from the default queue.
+//
 //   - replace(source: string, search: string, replacement: string) -> string
 //     Replaces all occurrences of search string with replacement string in the source string
 //
@@ -103,6 +118,20 @@
 //	              pipelineRun.spec.params.filter(p, p.name == "build-platforms")[0].value.map(
 //	                  p, annotation("kueue.konflux-ci.dev/requests-" + p, "1")
 //	              ) : []`
+//
+// CEL-based routing with multiKueue — route builds to spoke, releases to hub:
+//
+//	expression := `has(pipelineRun.metadata.labels) &&
+//	              "pipeline-type" in pipelineRun.metadata.labels &&
+//	              pipelineRun.metadata.labels["pipeline-type"] == "build" ?
+//	              multiKueue("multikueue-queue") : []`
+//
+// Set a custom managedBy for release pipelines:
+//
+//	expression := `has(pipelineRun.metadata.labels) &&
+//	              "pipeline-type" in pipelineRun.metadata.labels &&
+//	              pipelineRun.metadata.labels["pipeline-type"] == "release" ?
+//	              [managedBy("tekton.dev/pipeline")] : []`
 //
 // Using string manipulation with replace function:
 //
