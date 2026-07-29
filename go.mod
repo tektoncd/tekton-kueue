@@ -80,7 +80,7 @@ require (
 	github.com/project-codeflare/appwrapper v1.2.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
-	github.com/prometheus/procfs v0.20.1 // indirect
+	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/prometheus/statsd_exporter v0.29.0 // indirect
 	github.com/ray-project/kuberay/ray-operator v1.5.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
