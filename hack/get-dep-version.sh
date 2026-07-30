@@ -4,7 +4,7 @@
 # Usage: ./hack/get-dep-version.sh <module-path>
 # Example: ./hack/get-dep-version.sh sigs.k8s.io/kueue
 
-set -e
+set -euo pipefail
 
 if [ -z "$1" ]; then
     echo "Usage: $0 <module-path>" >&2
@@ -19,7 +19,7 @@ if [ ! -f "go.mod" ]; then
     exit 1
 fi
 
-VERSION=$(grep "$MODULE" go.mod | awk '{print $2}')
+VERSION=$(awk -v m="$MODULE" '$1 == m {print $2; exit}' go.mod)
 
 if [ -z "$VERSION" ]; then
     echo "Error: Could not find $MODULE in go.mod" >&2
