@@ -92,6 +92,14 @@
       "matchManagers": ["gomod"],
       "matchPackagePatterns": ["^k8s\\.io/"],
       "allowedVersions": "<0.36.0"
+    },
+    {
+      "groupName": "kind cluster tooling",
+      "description": "keep kind binary and node image in sync",
+      "matchDepNames": [
+        "kubernetes-sigs/kind",
+        "kindest/node"
+      ]
     }
   ],
   "customManagers": [
