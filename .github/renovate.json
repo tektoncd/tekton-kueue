@@ -88,9 +88,10 @@
       "allowedVersions": "<0.17.0"
     },
     {
-      "description": "Block k8s library upgrades beyond 0.35.x — kueue v0.16.x is built against k8s 0.35",
+      "description": "Block k8s library upgrades beyond 0.35.x — kueue v0.16.x is built against k8s 0.35 (apimachinery excluded, pulled to 0.36.x by pipeline v1.15.0)",
       "matchManagers": ["gomod"],
       "matchPackagePatterns": ["^k8s\\.io/"],
+      "excludePackageNames": ["k8s.io/apimachinery"],
       "allowedVersions": "<0.36.0"
     }
   ]
