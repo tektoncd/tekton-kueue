@@ -18,7 +18,24 @@ package controller
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	tekv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/kueue/pkg/controller/jobframework"
 )
+
+func newTestPipelineRun(opts ...func(*tekv1.PipelineRun)) *PipelineRun {
+	plr := &tekv1.PipelineRun{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-plr",
+			Namespace: "default",
+		},
+	}
+	for _, opt := range opts {
+		opt(plr)
+	}
+	return (*PipelineRun)(plr)
+}
 
 var _ = Describe("PipelineRun Controller", func() {
 	Context("When reconciling a resource", func() {
@@ -27,6 +44,36 @@ var _ = Describe("PipelineRun Controller", func() {
 
 			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
 			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+	})
+
+	Describe("resourcesRequests", func() {
+		It("should return unretryable error when attempting to override the concurrency token", func() {
+			p := newTestPipelineRun(func(plr *tekv1.PipelineRun) {
+				plr.Annotations = map[string]string{
+					"kueue.konflux-ci.dev/requests-tekton.dev/pipelineruns": "0",
+				}
+			})
+			requests, err := p.resourcesRequests()
+			Expect(err).To(And(
+				MatchError(ContainSubstring("overriding the concurrency token")),
+				Satisfy(jobframework.IsUnretryableError),
+			))
+			Expect(requests).To(BeNil())
+		})
+
+		It("should return unretryable error when annotation value is negative", func() {
+			p := newTestPipelineRun(func(plr *tekv1.PipelineRun) {
+				plr.Annotations = map[string]string{
+					"kueue.konflux-ci.dev/requests-cpu": "-1",
+				}
+			})
+			requests, err := p.resourcesRequests()
+			Expect(err).To(And(
+				MatchError(ContainSubstring("negative resource quantity")),
+				Satisfy(jobframework.IsUnretryableError),
+			))
+			Expect(requests).To(BeNil())
 		})
 	})
 })

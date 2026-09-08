@@ -156,6 +156,9 @@ func mutate(pipelineRun *tekv1.PipelineRun, mutation *MutationRequest) (*tekv1.P
 				// This can happen if the user has manually set the value to a non-integer
 				return nil, fmt.Errorf("failed to parse existing resource value %q as integer for key %q: %w", existingValue, mutation.Key, err)
 			}
+			if existingInt < 0 {
+				return nil, fmt.Errorf("negative resource value %q for key %q is not allowed", existingValue, mutation.Key)
+			}
 			newValue += existingInt
 		}
 
