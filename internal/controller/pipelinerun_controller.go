@@ -182,8 +182,8 @@ func (p *PipelineRun) PodSets(ctx context.Context) ([]kueue.PodSet, error) {
 // PipelineRun will be added. This is useful for controlling the number
 // of PipelineRuns that can be executed concurrently.
 //
-// WARNING: Annotations are not fully validated and a panic will
-// happen if they can not be parsed as `resource.Quantity`.
+// Invalid or negative annotation values return an UnretryableError so
+// Kueue stops reconciling the PipelineRun instead of panicking.
 func (p *PipelineRun) resourcesRequests() (corev1.ResourceList, error) {
 	requests := corev1.ResourceList{
 		ResourcePipelineRunCount: resource.MustParse("1"),
@@ -196,7 +196,11 @@ func (p *PipelineRun) resourcesRequests() (corev1.ResourceList, error) {
 					fmt.Sprintf("overriding the concurrency token %q via annotation is not allowed", ResourcePipelineRunCount))
 			}
 
-			q := resource.MustParse(v)
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return nil, jobframework.UnretryableError(
+					fmt.Sprintf("invalid resource quantity in annotation %s=%q: %v", k, v, err))
+			}
 			if q.Sign() < 0 {
 				return nil, jobframework.UnretryableError(
 					fmt.Sprintf("negative resource quantity in annotation %s=%q is not allowed", k, v))
