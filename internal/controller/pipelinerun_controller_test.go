@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	tekv1 "github.com/tektoncd/pipeline/pkg/apis/pipeline/v1"
@@ -74,6 +76,37 @@ var _ = Describe("PipelineRun Controller", func() {
 				Satisfy(jobframework.IsUnretryableError),
 			))
 			Expect(requests).To(BeNil())
+		})
+
+		It("should return unretryable error when annotation value is not a valid resource.Quantity", func() {
+			p := newTestPipelineRun(func(plr *tekv1.PipelineRun) {
+				plr.Annotations = map[string]string{
+					"kueue.konflux-ci.dev/requests-cpu": "not-a-quantity",
+				}
+			})
+			requests, err := p.resourcesRequests()
+			Expect(err).To(And(
+				MatchError(And(
+					ContainSubstring("invalid resource quantity"),
+					ContainSubstring("not-a-quantity"),
+				)),
+				Satisfy(jobframework.IsUnretryableError),
+			))
+			Expect(requests).To(BeNil())
+		})
+	})
+
+	Describe("PodSets", func() {
+		It("should return an unretryable error when annotation has invalid resource quantity", func(ctx context.Context) {
+			p := newTestPipelineRun(func(plr *tekv1.PipelineRun) {
+				plr.Annotations = map[string]string{
+					"kueue.konflux-ci.dev/requests-cpu": "not-a-quantity",
+				}
+			})
+			Expect(p.PodSets(ctx)).Error().To(And(
+				MatchError(ContainSubstring("invalid resource quantity")),
+				Satisfy(jobframework.IsUnretryableError),
+			))
 		})
 	})
 })
