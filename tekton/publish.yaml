@@ -1,0 +1,150 @@
+# Copyright 2026 The Tekton Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: publish-tekton-kueue-release
+  annotations:
+    chains.tekton.dev/transparency-upload: "true"
+spec:
+  params:
+  - name: package
+    default: github.com/tektoncd/tekton-kueue
+  - name: versionTag
+    description: Release version in vX.Y.Z form
+  - name: imageRegistry
+    default: ghcr.io
+  - name: imageRegistryPath
+    default: tektoncd/tekton-kueue
+  - name: imageRegistryUser
+    default: tekton-robot
+  - name: releaseAsLatest
+    default: "true"
+  - name: platforms
+    default: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
+  - name: serviceAccountPath
+    description: Credential file within the release-secret workspace
+  workspaces:
+  - name: source
+    description: Repository checkout
+    mountPath: /go/src/github.com/konflux-ci/tekton-kueue
+  - name: release-secret
+    description: Credentials authorized to push release images
+  - name: output
+    description: Generated release artifacts
+  stepTemplate:
+    env:
+    - name: PROJECT_ROOT
+      value: $(workspaces.source.path)
+    - name: CONTAINER_REGISTRY_CREDENTIALS
+      value: $(workspaces.release-secret.path)/$(params.serviceAccountPath)
+    - name: CONTAINER_REGISTRY
+      value: $(params.imageRegistry)/$(params.imageRegistryPath)
+    - name: CONTAINER_REGISTRY_USER
+      value: $(params.imageRegistryUser)
+    - name: IMAGE_REGISTRY
+      value: $(params.imageRegistry)
+    - name: OUTPUT_ROOT
+      value: $(workspaces.output.path)
+    - name: PACKAGE
+      value: $(params.package)
+    - name: PLATFORMS
+      value: $(params.platforms)
+    - name: RELEASE_AS_LATEST
+      value: $(params.releaseAsLatest)
+    - name: VERSION_TAG
+      value: $(params.versionTag)
+  results:
+  - name: IMAGES
+    description: Digest-qualified images for Tekton Chains
+  steps:
+  - name: container-registry-auth
+    image: cgr.dev/chainguard/crane:latest-dev@sha256:dd9a345764e47517b80391648020b78c0ae6d4db0e392c7013b71e3817ed544c
+    script: |
+      #!/bin/sh
+      set -eu
+
+      docker_config=$(cat "$CONTAINER_REGISTRY_CREDENTIALS" | \
+        crane auth login -u "$CONTAINER_REGISTRY_USER" --password-stdin "$IMAGE_REGISTRY" 2>&1 | \
+        sed -n 's,^.*logged in via \(.*\)$,\1,p')
+      cp "$docker_config" /workspace/docker-config.json
+
+  - name: publish-image-and-manifests
+    image: ghcr.io/tektoncd/plumbing/ko@sha256:d3fbd9c489e2c0d318bfabeda36c60f6c2495e17d42ef1319a3d0bd7400ae620
+    env:
+    - name: KO_DOCKER_REPO
+      value: $(params.imageRegistry)/$(params.imageRegistryPath)
+    script: |
+      #!/usr/bin/env sh
+      set -eu
+
+      printf '%s\n' "$VERSION_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || {
+        echo "invalid release version: $VERSION_TAG" >&2
+        exit 1
+      }
+      case "$RELEASE_AS_LATEST" in
+        true|false) ;;
+        *) echo "releaseAsLatest must be true or false" >&2; exit 1 ;;
+      esac
+
+      OUTPUT_RELEASE_DIR="$OUTPUT_ROOT/$VERSION_TAG"
+      git config --global --add safe.directory "$PROJECT_ROOT"
+      mkdir -p "$HOME/.docker" "$OUTPUT_RELEASE_DIR/template"
+      cp /workspace/docker-config.json "$HOME/.docker/config.json"
+      cd "$PROJECT_ROOT"
+
+      make release \
+        KUSTOMIZE=/go/bin/kustomize \
+        RELEASE_DIR="$OUTPUT_RELEASE_DIR/template" \
+        RELEASE_IMAGE=ko://github.com/konflux-ci/tekton-kueue/cmd \
+        VERSION="$VERSION_TAG"
+
+      template="$OUTPUT_RELEASE_DIR/template/release-$VERSION_TAG.yaml"
+      ko resolve \
+        --bare \
+        --image-label="org.opencontainers.image.source=https://$PACKAGE" \
+        --platform="$PLATFORMS" \
+        -t "$VERSION_TAG" \
+        -f "$template" > "$OUTPUT_RELEASE_DIR/release.yaml"
+
+      sed "s#:$VERSION_TAG@#@#g" \
+        "$OUTPUT_RELEASE_DIR/release.yaml" > "$OUTPUT_RELEASE_DIR/release.notags.yaml"
+      rm -rf "$OUTPUT_RELEASE_DIR/template"
+
+      (
+        cd "$OUTPUT_RELEASE_DIR"
+        sha256sum release.yaml release.notags.yaml > SHA256SUMS
+      )
+
+      awk '$1 == "image:" {print $2}' "$OUTPUT_RELEASE_DIR/release.notags.yaml" | sort -u > /workspace/built-images
+      test "$(wc -l < /workspace/built-images)" -eq 1
+      image=$(cat /workspace/built-images)
+      case "$image" in
+        "$CONTAINER_REGISTRY"@sha256:*) ;;
+        *) echo "unexpected release image: $image" >&2; exit 1 ;;
+      esac
+      printf '%s,' "$image" > "$(results.IMAGES.path)"
+
+  - name: tag-latest
+    image: cgr.dev/chainguard/crane:latest-dev@sha256:dd9a345764e47517b80391648020b78c0ae6d4db0e392c7013b71e3817ed544c
+    script: |
+      #!/bin/sh
+      set -eu
+
+      [ "$RELEASE_AS_LATEST" = "true" ] || exit 0
+      mkdir -p "$HOME/.docker"
+      cp /workspace/docker-config.json "$HOME/.docker/config.json"
+      image=$(cat /workspace/built-images)
+      crane cp "$image" "${image%@*}:latest"
