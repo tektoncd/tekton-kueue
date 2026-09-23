@@ -1,4 +1,8 @@
 aliases:
+    tekton-multicluster-team:
+        - pramodbindal
+        - khrm
+        - waveywaves
     konflux-infra-team:
         - celeztyne
         - enkeefe00
