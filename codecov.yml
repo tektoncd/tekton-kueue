@@ -1,0 +1,33 @@
+codecov:
+  require_ci_to_pass: true
+
+ignore:
+  - ".agents/**"
+  - ".claude/**"
+  - ".cursor/**"
+  - "skills/**"
+  - "docs/**"
+  - "*.md"
+  - "*.toml"
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: true
+    patch:
+      default:
+        target: 80%
+        informational: true
+
+flags:
+  unit-tests:
+    carryforward: true
+  e2e-tests:
+    carryforward: true
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  require_changes: true

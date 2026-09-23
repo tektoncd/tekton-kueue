@@ -7,18 +7,27 @@ jobs:
   test-e2e:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    env:
+      IMG: konflux-ci.dev/tekton-kueue:v0.0.1
     steps:
       - name: Clone the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: go.mod
 
-      - name: Install the latest version of kind
+      - name: Install pinned kind version
+        # Renovate updates KIND_VERSION automatically; only stable releases are proposed.
+        # If kind and node image are updated independently a version mismatch may cause
+        # cluster creation to fail, which CI will catch before merge.
         run: |
-          curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-amd64
+          # renovate: datasource=github-releases depName=kubernetes-sigs/kind
+          KIND_VERSION=v0.32.0
+          curl -Lo ./kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64"
           chmod +x ./kind
           sudo mv ./kind /usr/local/bin/kind
 
@@ -26,18 +35,59 @@ jobs:
         run: kind version
 
       - name: Create kind cluster
-        run: kind create cluster
-        env:
-          KIND_EXPERIMENTAL_PROVIDER: podman        
-
-      - name: Running Test e2e
+        run: kind create cluster --image kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95 # renovate: datasource=docker depName=kindest/node versioning=docker
         env:
           KIND_EXPERIMENTAL_PROVIDER: podman
-          IMG: konflux-ci.dev/tekton-kueue:v0.0.1
+
+      - name: Build and load instrumented image
+        env:
+          KIND_EXPERIMENTAL_PROVIDER: podman
+          ENABLE_COVERAGE: "true"
         run: |
           go mod tidy
           make load-image "IMG=$IMG"
           podman exec kind-control-plane crictl images
+
+      - name: Install Kueue and Tekton
+        run: |
           make kueue
           make tekton
-          make test-e2e
+
+      - name: Run e2e tests
+        env:
+          KIND_EXPERIMENTAL_PROVIDER: podman
+          SKIP_CLEANUP: "true"
+        run: make test-e2e
+
+      - name: Collect e2e coverage
+        if: always()
+        run: |
+          mkdir -p coverage-output && chmod 777 coverage-output
+          cp $HOME/.kube/config /tmp/kubeconfig && chmod 644 /tmp/kubeconfig
+          podman run --rm \
+            --network host \
+            -v /tmp/kubeconfig:/kubeconfig:ro \
+            -v $PWD/coverage-output:/workspace/coverage-output \
+            -e KUBECONFIG=/kubeconfig \
+            quay.io/konflux-ci/konflux-devprod/coverport-cli \
+            collect \
+              --namespace=tekton-kueue \
+              --label-selector=control-plane=controller-manager \
+              --test-name=e2e-tests \
+              --output=/workspace/coverage-output || true
+
+      - name: Upload e2e coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+        with:
+          use_oidc: true
+          flags: e2e-tests
+          directory: coverage-output
+          fail_ci_if_error: false
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make undeploy || true
+          make uninstall || true
+          kubectl delete ns tekton-kueue || true
