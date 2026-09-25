@@ -25,3 +25,8 @@ go.work
 *.swp
 *.swo
 *~
+
+# Agent security
+.claude
+.cursor
+.agents
