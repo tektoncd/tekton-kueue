@@ -13,7 +13,7 @@ jobs:
       IMG: konflux-ci.dev/tekton-kueue:v0.0.1
     steps:
       - name: Clone the code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
@@ -84,10 +84,3 @@ jobs:
           flags: e2e-tests
           directory: coverage-output
           fail_ci_if_error: false
-
-      - name: Cleanup
-        if: always()
-        run: |
-          make undeploy || true
-          make uninstall || true
-          kubectl delete ns tekton-kueue || true
