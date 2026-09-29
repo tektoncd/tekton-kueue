@@ -738,6 +738,20 @@ func TestCELMutator_Mutate(t *testing.T) {
 			errMsg:              "failed to parse existing resource value \"invalid\" as integer",
 		},
 		{
+			name: "resource mutation - negative existing value rejected",
+			expressions: []string{
+				`resource("ibm-vm-z", 500)`,
+			},
+			initialLabels: nil,
+			initialAnnotations: map[string]string{
+				"kueue.konflux-ci.dev/requests-ibm-vm-z": "-100",
+			},
+			expectedLabels:      nil,
+			expectedAnnotations: nil,
+			expectErr:           true,
+			errMsg:              "negative resource value",
+		},
+		{
 			name: "multiple resource mutations - same key summing",
 			expressions: []string{
 				`resource("aws-vm-x", 2)`,

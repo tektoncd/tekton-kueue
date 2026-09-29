@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -143,7 +144,10 @@ func (p *PipelineRun) Object() client.Object {
 
 // PodSets implements jobframework.GenericJob.
 func (p *PipelineRun) PodSets(ctx context.Context) ([]kueue.PodSet, error) {
-	requests := p.resourcesRequests()
+	requests, err := p.resourcesRequests()
+	if err != nil {
+		return nil, err
+	}
 
 	return []kueue.PodSet{
 		{
@@ -178,21 +182,34 @@ func (p *PipelineRun) PodSets(ctx context.Context) ([]kueue.PodSet, error) {
 // PipelineRun will be added. This is useful for controlling the number
 // of PipelineRuns that can be executed concurrently.
 //
-// WARNING: Annotations are not validated and a panic will
-// happen if they can not be parsed as `resource.Quantity`.
-func (p *PipelineRun) resourcesRequests() corev1.ResourceList {
+// Invalid or negative annotation values return an UnretryableError so
+// Kueue stops reconciling the PipelineRun instead of panicking.
+func (p *PipelineRun) resourcesRequests() (corev1.ResourceList, error) {
 	requests := corev1.ResourceList{
 		ResourcePipelineRunCount: resource.MustParse("1"),
 	}
 
 	for k, v := range p.GetAnnotations() {
 		if t := strings.TrimPrefix(k, annotationResourcesRequests); t != k {
-			// TODO(@filariow): how to properly validate this?
-			requests[corev1.ResourceName(t)] = resource.MustParse(v)
+			if corev1.ResourceName(t) == ResourcePipelineRunCount {
+				return nil, jobframework.UnretryableError(
+					fmt.Sprintf("overriding the concurrency token %q via annotation is not allowed", ResourcePipelineRunCount))
+			}
+
+			q, err := resource.ParseQuantity(v)
+			if err != nil {
+				return nil, jobframework.UnretryableError(
+					fmt.Sprintf("invalid resource quantity in annotation %s=%q: %v", k, v, err))
+			}
+			if q.Sign() < 0 {
+				return nil, jobframework.UnretryableError(
+					fmt.Sprintf("negative resource quantity in annotation %s=%q is not allowed", k, v))
+			}
+			requests[corev1.ResourceName(t)] = q
 		}
 	}
 
-	return requests
+	return requests, nil
 }
 
 // PodsReady implements jobframework.GenericJob.
