@@ -21,12 +21,12 @@ tekton-kueue is a Go controller (kubebuilder) integrating Tekton PipelineRuns wi
 
 ## Branch Setup
 
-If a dedicated branch already exists for this work, use it. Otherwise, create a branch from the latest main of `konflux-ci/tekton-kueue`.
+If a dedicated branch already exists for this work, use it. Otherwise, create a branch from the latest main of `tektoncd/tekton-kueue`.
 
-First, find which remote points to `konflux-ci/tekton-kueue`:
+First, find which remote points to `tektoncd/tekton-kueue`:
 
 ```bash
-git remote -v | grep konflux-ci/tekton-kueue
+git remote -v | grep tektoncd/tekton-kueue
 ```
 
 Then fetch and branch from it:
