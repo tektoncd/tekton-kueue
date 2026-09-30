@@ -25,7 +25,8 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
-      - uses: konflux-ci/deptriage@6185418331a2b53550885ec4b9417819cc96f907 # pinned main
+      # The organization Actions policy currently allows only this branch ref.
+      - uses: konflux-ci/deptriage@main
         with:
           command: both
           pr-number: ${{ github.event.pull_request.number }}
