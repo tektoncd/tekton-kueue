@@ -10,6 +10,7 @@ jobs:
     name: Run on Ubuntu
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       id-token: write
     steps:
       - name: Clone the code
