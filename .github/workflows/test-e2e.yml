@@ -65,11 +65,11 @@ jobs:
         if: always()
         run: |
           mkdir -p coverage-output && chmod 777 coverage-output
-          cp $HOME/.kube/config /tmp/kubeconfig && chmod 644 /tmp/kubeconfig
+          cp "$HOME/.kube/config" /tmp/kubeconfig && chmod 644 /tmp/kubeconfig
           podman run --rm \
             --network host \
             -v /tmp/kubeconfig:/kubeconfig:ro \
-            -v $PWD/coverage-output:/workspace/coverage-output \
+            -v "$PWD/coverage-output:/workspace/coverage-output" \
             -e KUBECONFIG=/kubeconfig \
             quay.io/konflux-ci/konflux-devprod/coverport-cli \
             collect \
