@@ -32,14 +32,14 @@ All CI investigation commands below depend on it.
 ### GitHub Actions checks
 
 ```bash
-gh pr checks <PR-number> --repo konflux-ci/tekton-kueue
+gh pr checks <PR-number> --repo tektoncd/tekton-kueue
 ```
 
 To investigate a failed check:
 
 ```bash
-gh run view <run-id> --repo konflux-ci/tekton-kueue
-gh run view <run-id> --repo konflux-ci/tekton-kueue --log-failed
+gh run view <run-id> --repo tektoncd/tekton-kueue
+gh run view <run-id> --repo tektoncd/tekton-kueue --log-failed
 ```
 
 ### Tekton / Konflux pipeline checks
@@ -125,11 +125,11 @@ The `.tekton/` pipelines run security scans and multi-arch container builds. The
 Find the run ID from the PR checks output:
 
 ```bash
-gh pr checks <PR-number> --repo konflux-ci/tekton-kueue
+gh pr checks <PR-number> --repo tektoncd/tekton-kueue
 ```
 
 The run ID is part of the check's detail URL. Then rerun only the failed jobs:
 
 ```bash
-gh run rerun <run-id> --repo konflux-ci/tekton-kueue --failed
+gh run rerun <run-id> --repo tektoncd/tekton-kueue --failed
 ```
