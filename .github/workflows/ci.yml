@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and verify generated files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Build and verify generated files
+        run: |
+          make build
+          git diff --exit-code
+
+  test:
+    name: Unit tests
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/test.yml
+
+  lint:
+    name: Lint
+    needs: build
+    permissions:
+      contents: read
+      checks: write
+    uses: ./.github/workflows/lint.yml
+
+  e2e:
+    name: End-to-end tests
+    needs: build
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/test-e2e.yml
+
+  dependency-review:
+    name: Dependency review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: low
+
+  workflow-lint:
+    name: Workflow lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Run actionlint
+        uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+        with:
+          version: 1.7.12
+
+  ci-summary:
+    name: CI summary
+    needs: [build, test, lint, e2e, dependency-review, workflow-lint]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check CI results
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          LINT_RESULT: ${{ needs.lint.result }}
+          E2E_RESULT: ${{ needs.e2e.result }}
+          DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
+          WORKFLOW_LINT_RESULT: ${{ needs.workflow-lint.result }}
+        run: |
+          results=(
+            "build=${BUILD_RESULT}"
+            "test=${TEST_RESULT}"
+            "lint=${LINT_RESULT}"
+            "e2e=${E2E_RESULT}"
+            "dependency-review=${DEPENDENCY_REVIEW_RESULT}"
+            "workflow-lint=${WORKFLOW_LINT_RESULT}"
+          )
+          failed=0
+          for result in "${results[@]}"; do
+            name="${result%%=*}"
+            status="${result#*=}"
+            echo "${name}: ${status}"
+            if [[ "${status}" != "success" ]]; then
+              failed=1
+            fi
+          done
+          if [[ "${failed}" -ne 0 ]]; then
+            echo "One or more required CI jobs did not succeed"
+            exit 1
+          fi
