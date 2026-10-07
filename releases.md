@@ -6,7 +6,9 @@ Tekton Kueue follows the [Tekton release policy](https://github.com/tektoncd/com
 
 A minor release is planned every three months. Each minor release is designated for long-term support (LTS) until the third subsequent minor release is published, which is approximately one year. During that period, patch releases may be issued for CVEs, dependency issues, and critical component issues covered by the Tekton release policy.
 
-The first Tekton Kueue release covered by this policy is planned to be `v0.5.0`. Earlier releases remain available as historical releases but are not covered by this support commitment. Release branch naming will follow the resolution of [#20](https://github.com/tektoncd/tekton-kueue/issues/20) before `v0.5.0` is published.
+The first Tekton Kueue release covered by this upstream support policy is planned to be `v0.5.0`. Earlier releases are not covered by this upstream support commitment. Scheduled automation scans `v0.3` and newer for security and critical-fix patches; older lines require a maintainer-approved manual patch release.
+
+Supported release branches use `release-vX.Y.x`, matching the Tekton Kueue minor version. Compatibility with Kueue and Tekton Pipelines is recorded separately for each release line because those projects have independent version numbers.
 
 ## Proposed release artifacts
 
@@ -26,7 +28,7 @@ Once the release path is deployed, manifests will be stored under `https://infra
 
 - **Initial release:** `v0.5.0` (planned)
 - **End of life:** when `v0.8.0` is published
-- **Release branch:** selected after the branch convention in [#20](https://github.com/tektoncd/tekton-kueue/issues/20) is resolved
+- **Release branch:** `release-v0.5.x`
 - **Compatibility:** recorded after the release-candidate test matrix completes
 
 The release date, exact end-of-life date, compatibility ranges, and patch-release links will be recorded when `v0.5.0` is published.
