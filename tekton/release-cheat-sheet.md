@@ -15,7 +15,7 @@ The automated steps below become operational only after the release Pipeline tra
 
 ## Publish an initial release
 
-1. Create the policy-defined release branch from the verified commit, using the branch convention selected in [#20](https://github.com/tektoncd/tekton-kueue/issues/20).
+1. Create `release-vX.Y.x` from the verified commit. For example, create `release-v0.5.x` to publish the initial `v0.5.0` release.
 2. Creating the release branch in `tektoncd/tekton-kueue` triggers Pipelines as Code in the Tekton OCI CI/CD cluster to start the release Pipeline from the trusted default-branch `.tekton/release.yaml`.
 3. Monitor the PipelineRun in the `releases-tekton-kueue` namespace.
 4. Review the generated GitHub release notes and verify all publication checks below before publishing the draft.
@@ -26,7 +26,7 @@ The automated steps below become operational only after the release Pipeline tra
 2. After the cherry-pick passes CI on the release branch, run the **Patch Release** GitHub workflow with the branch, next `vX.Y.Z` version, and whether it should update `latest`.
 3. Monitor and verify the release as for an initial release.
 
-The scheduled patch workflow may detect unreleased commits, but a release operator must still verify the resulting release before announcing it.
+The scheduled patch workflow scans `release-v0.3.x` and newer for unreleased commits. Older release lines require manual dispatch. A release operator must still verify every resulting release before announcing it.
 
 ## Verify publication
 

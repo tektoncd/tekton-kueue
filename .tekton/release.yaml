@@ -21,8 +21,7 @@ metadata:
     pipelinesascode.tekton.dev/on-target-branch: "[release-v*]"
     pipelinesascode.tekton.dev/on-cel-expression: |
       event == "push" && has(body.created) && body.created == true &&
-      target_branch.startsWith("release-v") &&
-      (target_branch.endsWith("-lts") || target_branch.endsWith(".x"))
+      target_branch.matches("^release-v[0-9]+\\.[0-9]+\\.x$")
     pipelinesascode.tekton.dev/pipeline: tekton/release-pipeline.yaml
     pipelinesascode.tekton.dev/max-keep-runs: "5"
 spec:
@@ -38,7 +37,7 @@ spec:
   - name: gitRevision
     value: "{{ revision }}"
   - name: versionTag
-    value: '{{ cel: pac.target_branch.replace("release-", "").replace("-lts", ".0").replace(".x", ".0") }}'
+    value: '{{ cel: pac.target_branch.replace("release-", "").replace(".x", ".0") }}'
   - name: imageRegistry
     value: ghcr.io
   - name: imageRegistryPath
