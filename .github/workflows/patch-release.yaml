@@ -25,8 +25,8 @@ permissions:
 env:
   PAC_CONTROLLER_URL: https://pac.infra.tekton.dev
   PAC_REPOSITORY_NAME: tektoncd-tekton-kueue
-  # v0.5 is the first release line managed by this automation.
-  MIN_RELEASE_VERSION: "0.5"
+  # v0.3 is the oldest release line scanned for automatic patch releases.
+  MIN_RELEASE_VERSION: "0.3"
 
 jobs:
   scan-release-branches:
@@ -51,7 +51,7 @@ jobs:
         latest_minor=0
         for ref in $(git branch -r --list 'origin/release-v*'); do
           branch="${ref#origin/}"
-          if [[ "$branch" =~ ^release-v([0-9]+)\.([0-9]+)(-lts|\.x)$ ]]; then
+          if [[ "$branch" =~ ^release-v([0-9]+)\.([0-9]+)\.x$ ]]; then
             major="${BASH_REMATCH[1]}"
             minor="${BASH_REMATCH[2]}"
             if [ "$major" -gt "$latest_major" ] || { [ "$major" -eq "$latest_major" ] && [ "$minor" -gt "$latest_minor" ]; }; then
@@ -69,7 +69,7 @@ jobs:
 
         for ref in $(git branch -r --list 'origin/release-v*'); do
           branch="${ref#origin/}"
-          if [[ ! "$branch" =~ ^release-v([0-9]+)\.([0-9]+)(-lts|\.x)$ ]]; then
+          if [[ ! "$branch" =~ ^release-v([0-9]+)\.([0-9]+)\.x$ ]]; then
             echo "::notice::Ignoring unsupported branch name ${branch}"
             continue
           fi
@@ -147,19 +147,23 @@ jobs:
         VERSION: ${{ inputs.version }}
       shell: bash
       run: |
-        if [[ ! "$BRANCH" =~ ^release-v([0-9]+)\.([0-9]+)(-lts|\.x)$ ]]; then
+        if [[ ! "$BRANCH" =~ ^release-v([0-9]+)\.([0-9]+)\.x$ ]]; then
           echo "::error::Invalid branch format: ${BRANCH}"
           exit 1
         fi
         branch_major="${BASH_REMATCH[1]}"
         branch_minor="${BASH_REMATCH[2]}"
 
-        if [[ ! "$VERSION" =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
+        if [[ ! "$VERSION" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
           echo "::error::Invalid version format: ${VERSION}"
           exit 1
         fi
         if [ "$branch_major" != "${BASH_REMATCH[1]}" ] || [ "$branch_minor" != "${BASH_REMATCH[2]}" ]; then
           echo "::error::Version ${VERSION} does not belong to ${BRANCH}"
+          exit 1
+        fi
+        if [ "${BASH_REMATCH[3]}" -eq 0 ]; then
+          echo "::error::Initial releases are created by pushing the release branch"
           exit 1
         fi
 
