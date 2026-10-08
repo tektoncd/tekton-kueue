@@ -87,3 +87,5 @@ When making common changes, use these as reference implementations:
 - Before opening a PR, writing a PR description, or interpreting CI results, read `skills/pr-workflow.md`
 - When a CI check fails on a PR, read `skills/ci-troubleshooting.md`
 - When working interactively on new features or significant changes, read `skills/brainstorming-workflow.md` before making changes
+
+testing ci triggers
