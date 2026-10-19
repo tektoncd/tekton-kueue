@@ -82,13 +82,15 @@ spec:
       cp "$docker_config" /workspace/docker-config.json
 
   - name: publish-image-and-manifests
-    image: ghcr.io/tektoncd/plumbing/ko@sha256:d3fbd9c489e2c0d318bfabeda36c60f6c2495e17d42ef1319a3d0bd7400ae620
+    image: ghcr.io/tektoncd/plumbing/ko@sha256:e0b6096ec523ee9f72838596b46ab80b120242fe48422f6af684f1fc9afa4d12
     env:
     - name: KO_DOCKER_REPO
       value: $(params.imageRegistry)/$(params.imageRegistryPath)
     script: |
       #!/usr/bin/env sh
       set -eu
+
+      apk add --no-cache bash make
 
       printf '%s\n' "$VERSION_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || {
         echo "invalid release version: $VERSION_TAG" >&2
