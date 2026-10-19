@@ -152,6 +152,10 @@ verify-release: kustomize
 	test "$$matches" -eq 2; \
 	! grep -Eq 'quay.io|konflux-ci/tekton-kueue' "$$tmp/release-v0.0.0-test.yaml"
 
+.PHONY: verify-release-config
+verify-release-config:
+	CONTAINER_TOOL="$(CONTAINER_TOOL)" bash hack/verify-release-config.sh
+
 ##@ Deployment
 
 ifndef ignore-not-found

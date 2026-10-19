@@ -28,6 +28,7 @@ jobs:
           go mod tidy
           make test
           make verify-release
+          CONTAINER_TOOL=docker make verify-release-config
           git diff --exit-code
 
       - name: Upload coverage to Codecov
