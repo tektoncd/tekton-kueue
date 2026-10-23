@@ -82,7 +82,7 @@ spec:
       cp "$docker_config" /workspace/docker-config.json
 
   - name: publish-image-and-manifests
-    image: ghcr.io/tektoncd/plumbing/ko@sha256:e0b6096ec523ee9f72838596b46ab80b120242fe48422f6af684f1fc9afa4d12
+    image: ghcr.io/tektoncd/plumbing/ko@sha256:3bb0f6c463f9eaffc72c35658bac799c16600fd7332298c6af2c5a4e58166229
     env:
     - name: KO_DOCKER_REPO
       value: $(params.imageRegistry)/$(params.imageRegistryPath)
