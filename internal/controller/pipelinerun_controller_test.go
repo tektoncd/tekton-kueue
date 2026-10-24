@@ -113,7 +113,7 @@ var _ = Describe("PipelineRun", func() {
 	Describe("PodsReady", func() {
 		It("should panic because it should not be called", func(ctx context.Context) {
 			p := newTestPipelineRun()
-			Expect(func() { p.PodsReady(ctx) }).To(PanicWith("pods ready shouldn't be called"))
+			Expect(func() { p.PodsReady(ctx, nil) }).To(PanicWith("pods ready shouldn't be called"))
 		})
 	})
 
@@ -134,7 +134,7 @@ var _ = Describe("PipelineRun", func() {
 			p := newTestPipelineRun(func(plr *tekv1.PipelineRun) {
 				plr.Spec.Status = tekv1.PipelineRunSpecStatus(initialStatus)
 			})
-			Expect(p.RunWithPodSetsInfo(ctx, nil)).To(Succeed())
+			Expect(p.RunWithPodSetsInfo(ctx, nil, nil)).To(Succeed())
 			Expect(p.Spec.Status).To(BeEmpty())
 		},
 		Entry("when status is empty", ""),
@@ -374,7 +374,7 @@ var _ = Describe("PipelineRun", func() {
 	Describe("PodSets", func() {
 		It("should return a single pod set with the correct structure", func(ctx context.Context) {
 			p := newTestPipelineRun()
-			podSets, err := p.PodSets(ctx)
+			podSets, err := p.PodSets(ctx, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podSets).To(HaveLen(1))
 
@@ -395,7 +395,7 @@ var _ = Describe("PipelineRun", func() {
 					"kueue.konflux-ci.dev/requests-memory": "8Gi",
 				}
 			})
-			podSets, err := p.PodSets(ctx)
+			podSets, err := p.PodSets(ctx, nil)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(podSets).To(HaveLen(1))
 			Expect(podSets[0].Template.Spec.Containers).To(HaveLen(1))
@@ -414,7 +414,7 @@ var _ = Describe("PipelineRun", func() {
 					"kueue.konflux-ci.dev/requests-cpu": "not-a-quantity",
 				}
 			})
-			Expect(p.PodSets(ctx)).Error().To(And(
+			Expect(p.PodSets(ctx, nil)).Error().To(And(
 				MatchError(ContainSubstring("invalid resource quantity")),
 				Satisfy(jobframework.IsUnretryableError),
 			))
