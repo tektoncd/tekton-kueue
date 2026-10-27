@@ -25,8 +25,8 @@ jobs:
 
       - name: Install pinned kind version
         # Renovate updates KIND_VERSION automatically; only stable releases are proposed.
-        # If kind and node image are updated independently a version mismatch may cause
-        # cluster creation to fail, which CI will catch before merge.
+        # The cluster uses the node image this kind release defaults to, so the two
+        # always match.
         run: |
           # renovate: datasource=github-releases depName=kubernetes-sigs/kind
           KIND_VERSION=v0.32.0
@@ -38,7 +38,7 @@ jobs:
         run: kind version
 
       - name: Create kind cluster
-        run: kind create cluster --image kindest/node:v1.35.5@sha256:ce977ae6d65918d0b58a5f8b5e940429c2ce42fa3a5619ec2bbc60b949c0ac95 # renovate: datasource=docker depName=kindest/node versioning=docker
+        run: kind create cluster
         env:
           KIND_EXPERIMENTAL_PROVIDER: podman
 
@@ -87,10 +87,3 @@ jobs:
           flags: e2e-tests
           directory: coverage-output
           fail_ci_if_error: false
-
-      - name: Cleanup
-        if: always()
-        run: |
-          make undeploy || true
-          make uninstall || true
-          kubectl delete ns tekton-kueue || true

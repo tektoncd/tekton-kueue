@@ -99,14 +99,6 @@
       "matchManagers": ["gomod"],
       "matchPackageNames": ["github.com/kubeflow/trainer/v2"],
       "enabled": false
-    },
-    {
-      "groupName": "kind cluster tooling",
-      "description": "keep kind binary and node image in sync",
-      "matchDepNames": [
-        "kubernetes-sigs/kind",
-        "kindest/node"
-      ]
     }
   ],
   "customManagers": [
@@ -120,16 +112,6 @@
         "#\\s*renovate:\\s*datasource=(?<datasource>[a-z-]+)\\s+depName=(?<depName>[^\\s]+)\\n\\s*KIND_VERSION=(?<currentValue>v[^\\s]+)"
       ],
       "extractVersionTemplate": "^v(?<version>.+)$"
-    },
-    {
-      "customType": "regex",
-      "description": "Update kind node image in CI workflows",
-      "managerFilePatterns": [
-        ".github/workflows/**"
-      ],
-      "matchStrings": [
-        "kindest/node:(?<currentValue>v[^@\\s#]+)@(?<currentDigest>sha256:[a-f0-9]+)\\s*#\\s*renovate:\\s*datasource=(?<datasource>[a-z-]+)\\s+depName=(?<depName>[^\\s]+)\\s+versioning=(?<versioning>[^\\s]+)"
-      ]
     }
   ]
 }
