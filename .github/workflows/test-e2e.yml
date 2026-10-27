@@ -23,7 +23,7 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install pinned kind version
+      - name: Install pinned kind release (uses its default node image)
         # Renovate updates KIND_VERSION automatically; only stable releases are proposed.
         # The cluster uses the node image this kind release defaults to, so the two
         # always match.
