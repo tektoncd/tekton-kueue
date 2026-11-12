@@ -35,9 +35,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - command:
-        - /manager
-        args:
+      - args:
           - controller
           - --leader-elect
           - --health-probe-bind-address=:8081
