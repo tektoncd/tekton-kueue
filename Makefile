@@ -143,6 +143,8 @@ release: kustomize
 	mkdir -p "$(RELEASE_DIR)"
 	KUSTOMIZE=$(KUSTOMIZE) hack/render-manifest.sh "$(RELEASE_IMAGE)" > "$(RELEASE_DIR)/release-$(VERSION).yaml"
 
+# Release images are built with ko, which ships the binary at /ko-app/cmd, so
+# the rendered manifest must rely on the image ENTRYPOINT instead of /manager.
 .PHONY: verify-release
 verify-release: kustomize
 	@tmp=$$(mktemp -d); trap 'rm -rf "$$tmp"' EXIT; \
@@ -150,6 +152,7 @@ verify-release: kustomize
 	$(MAKE) --no-print-directory release RELEASE_DIR="$$tmp" VERSION=v0.0.0-test RELEASE_IMAGE="$$image"; \
 	matches=$$(grep -Fc "image: $$image" "$$tmp/release-v0.0.0-test.yaml"); \
 	test "$$matches" -eq 2; \
+	! grep -Fq -- '- /manager' "$$tmp/release-v0.0.0-test.yaml" || exit 1; \
 	! grep -Eq 'quay.io|konflux-ci/tekton-kueue' "$$tmp/release-v0.0.0-test.yaml"
 
 .PHONY: verify-release-config
