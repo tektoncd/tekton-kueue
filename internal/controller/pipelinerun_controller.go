@@ -38,6 +38,7 @@ import (
 
 // +kubebuilder:rbac:groups=scheduling.k8s.io,resources=priorityclasses,verbs=list;get;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;watch;update;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=workloads,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=workloads/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=workloads/finalizers,verbs=update
@@ -94,7 +95,7 @@ func SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 		ctx,
 		mgr.GetClient(),
 		mgr.GetFieldIndexer(),
-		mgr.GetEventRecorderFor("kueue-plr"),
+		mgr.GetEventRecorder("kueue-plr"),
 		// In v1beta2, WaitForPodsReady removed its Enable bool field — a non-nil
 		// pointer now means the feature is enabled. Pass nil to keep it disabled,
 		// matching the original v1beta1 behavior where Enable defaulted to false.
@@ -179,7 +180,7 @@ func (p *PipelineRun) Object() client.Object {
 // so we use a dummy container whose resource requests are derived from
 // annotations on the PipelineRun. This allows Kueue to account for resources
 // without needing to know the actual task pod specifications.
-func (p *PipelineRun) PodSets(_ context.Context) ([]kueue.PodSet, error) {
+func (p *PipelineRun) PodSets(_ context.Context, _ client.Client) ([]kueue.PodSet, error) {
 	requests, err := p.resourcesRequests()
 	if err != nil {
 		return nil, err
@@ -275,7 +276,7 @@ func (p *PipelineRun) parseResourcesRequestsAnnotation(k, v string) (*corev1.Res
 // This method is never called because the WaitForPodsReady configuration is
 // not enabled for PipelineRuns. Kueue tracks pod readiness for batch Jobs,
 // but PipelineRuns manage their own pod lifecycle through Tekton.
-func (p *PipelineRun) PodsReady(_ context.Context) bool {
+func (p *PipelineRun) PodsReady(_ context.Context, _ client.Client) bool {
 	panic("pods ready shouldn't be called")
 }
 
@@ -285,7 +286,7 @@ func (p *PipelineRun) RestorePodSetsInfo(podSetsInfo []podset.PodSetInfo) bool {
 }
 
 // RunWithPodSetsInfo implements jobframework.GenericJob.
-func (p *PipelineRun) RunWithPodSetsInfo(_ context.Context, podSetsInfo []podset.PodSetInfo) error {
+func (p *PipelineRun) RunWithPodSetsInfo(_ context.Context, _ client.Client, podSetsInfo []podset.PodSetInfo) error {
 	p.Spec.Status = ""
 	return nil
 }
