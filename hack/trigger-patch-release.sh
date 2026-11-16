@@ -12,10 +12,6 @@ set -euo pipefail
 : "${RELEASE_VERSION:?}"
 
 check_name="Tekton CI (Pipelines-as-Code) / release-patch"
-draft_poll_interval_seconds=${PAC_DRAFT_POLL_INTERVAL_SECONDS:-5}
-draft_timeout_seconds=${PAC_DRAFT_WAIT_TIMEOUT_SECONDS:-60}
-poll_interval_seconds=${PAC_POLL_INTERVAL_SECONDS:-20}
-timeout_seconds=${PAC_WAIT_TIMEOUT_SECONDS:-10800}
 triggered_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 branch_sha=$(gh api \
   "repos/${GITHUB_REPOSITORY}/git/ref/heads/${RELEASE_BRANCH}" \
@@ -35,22 +31,38 @@ jq -n '{
   --data-binary @- \
   "${PAC_CONTROLLER_URL}/incoming"
 
-deadline=$((SECONDS + timeout_seconds))
+deadline=$((SECONDS + 10800))
 check=""
+check_id=""
 while [ "$SECONDS" -lt "$deadline" ]; do
-  check=$(gh api \
-    "repos/${GITHUB_REPOSITORY}/commits/${branch_sha}/check-runs?per_page=100" \
-    --jq "[.check_runs[]
-      | select(.name == \"${check_name}\")
-      | select(.started_at != null)
-      | select(.started_at >= \"${triggered_at}\")]
-      | sort_by(.started_at)
-      | .[0] // empty")
+  if [ -n "$check_id" ]; then
+    check=$(gh api "repos/${GITHUB_REPOSITORY}/check-runs/${check_id}")
+  else
+    # PaC resolves the branch after dispatch, possibly after another push.
+    new_commits=$(gh api --paginate \
+      "repos/${GITHUB_REPOSITORY}/compare/${branch_sha}...${RELEASE_BRANCH}?per_page=100" \
+      --jq '.commits[].sha')
+    for commit_sha in "$branch_sha" $new_commits; do
+      check=$(gh api \
+        "repos/${GITHUB_REPOSITORY}/commits/${commit_sha}/check-runs?per_page=100" \
+        --jq "[.check_runs[]
+          | select(.name == \"${check_name}\")
+          | select(.started_at != null)
+          | select(.started_at >= \"${triggered_at}\")]
+          | sort_by(.started_at)
+          | .[0] // empty")
+      if [ -n "$check" ]; then
+        # Follow this run even if the branch advances again.
+        check_id=$(jq -r '.id' <<<"$check")
+        break
+      fi
+    done
+  fi
 
   if [ -n "$check" ] && [ "$(jq -r '.status' <<<"$check")" = "completed" ]; then
     break
   fi
-  sleep "$poll_interval_seconds"
+  sleep 20
 done
 
 if [ -z "$check" ] || [ "$(jq -r '.status' <<<"$check")" != "completed" ]; then
@@ -66,12 +78,12 @@ if [ "$conclusion" != "success" ]; then
 fi
 
 draft=""
-draft_deadline=$((SECONDS + draft_timeout_seconds))
+draft_deadline=$((SECONDS + 60))
 while [ "$SECONDS" -lt "$draft_deadline" ]; do
   draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
     --jq "[.[] | select(.tag_name == \"${RELEASE_VERSION}\" and .draft)] | .[0] // empty")
   [ -n "$draft" ] && break
-  sleep "$draft_poll_interval_seconds"
+  sleep 5
 done
 
 if [ -z "$draft" ]; then
