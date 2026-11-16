@@ -12,7 +12,9 @@ set -euo pipefail
 : "${RELEASE_VERSION:?}"
 
 check_name="Tekton CI (Pipelines-as-Code) / release-patch"
+draft_poll_interval_seconds=${PAC_DRAFT_POLL_INTERVAL_SECONDS:-5}
 draft_timeout_seconds=${PAC_DRAFT_WAIT_TIMEOUT_SECONDS:-60}
+poll_interval_seconds=${PAC_POLL_INTERVAL_SECONDS:-20}
 timeout_seconds=${PAC_WAIT_TIMEOUT_SECONDS:-10800}
 triggered_at=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
 branch_sha=$(gh api \
@@ -48,7 +50,7 @@ while [ "$SECONDS" -lt "$deadline" ]; do
   if [ -n "$check" ] && [ "$(jq -r '.status' <<<"$check")" = "completed" ]; then
     break
   fi
-  sleep 20
+  sleep "$poll_interval_seconds"
 done
 
 if [ -z "$check" ] || [ "$(jq -r '.status' <<<"$check")" != "completed" ]; then
@@ -69,7 +71,7 @@ while [ "$SECONDS" -lt "$draft_deadline" ]; do
   draft=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
     --jq "[.[] | select(.tag_name == \"${RELEASE_VERSION}\" and .draft)] | .[0] // empty")
   [ -n "$draft" ] && break
-  sleep 5
+  sleep "$draft_poll_interval_seconds"
 done
 
 if [ -z "$draft" ]; then
