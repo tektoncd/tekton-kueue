@@ -117,6 +117,7 @@ spec:
       ko resolve \
         --bare \
         --image-label="org.opencontainers.image.source=https://$PACKAGE" \
+        --image-label="org.opencontainers.image.url=https://$PACKAGE" \
         --platform="$PLATFORMS" \
         -t "$VERSION_TAG" \
         -f "$template" > "$OUTPUT_RELEASE_DIR/release.yaml"
