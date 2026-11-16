@@ -111,21 +111,24 @@ run_scenario() {
   date() {
     printf '%s\n' "2026-11-16T21:30:00Z"
   }
-  export -f curl date gh
+  sleep() {
+    SECONDS=$((SECONDS + 1))
+  }
+  export -f curl date gh sleep
 
   local status=0
-  local draft_timeout=1
-  local wait_timeout=1
+  local draft_timeout=2
+  local wait_timeout=2
   SCENARIO=$scenario \
     GH_STATE_DIR=$tmp \
     GH_TOKEN=test \
     GITHUB_REPOSITORY=tektoncd/tekton-kueue \
     GITHUB_STEP_SUMMARY=$summary \
     PAC_CONTROLLER_URL=https://example.test \
-    PAC_DRAFT_POLL_INTERVAL_SECONDS=0.05 \
+    PAC_DRAFT_POLL_INTERVAL_SECONDS=1 \
     PAC_DRAFT_WAIT_TIMEOUT_SECONDS=$draft_timeout \
     PAC_INCOMING_SECRET=secret \
-    PAC_POLL_INTERVAL_SECONDS=0.05 \
+    PAC_POLL_INTERVAL_SECONDS=1 \
     PAC_REPOSITORY_NAME=tektoncd-tekton-kueue \
     PAC_WAIT_TIMEOUT_SECONDS=$wait_timeout \
     RELEASE_AS_LATEST=true \
