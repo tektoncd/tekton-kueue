@@ -23,6 +23,8 @@ go_image=$(image_for_step test-and-build "$root/tekton/release-pipeline.yaml")
 test -n "$publish_image"
 test -n "$go_image"
 grep -Fq "apk add --no-cache bash make" "$root/tekton/publish.yaml"
+grep -Fq 'org.opencontainers.image.source=https://$PACKAGE' "$root/tekton/publish.yaml"
+grep -Fq 'org.opencontainers.image.url=https://$PACKAGE' "$root/tekton/publish.yaml"
 
 "$container_tool" run --rm --platform "$platform" \
   -v "$root:/workspace/source" \
