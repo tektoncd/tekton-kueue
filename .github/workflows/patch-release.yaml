@@ -20,6 +20,7 @@ name: Patch Release
   - cron: "0 10 * * 4"
 
 permissions:
+  checks: read
   contents: read
 
 env:
@@ -110,37 +111,41 @@ jobs:
     needs: scan-release-branches
     if: needs.scan-release-branches.outputs.has_releases == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 190
+    concurrency:
+      group: "patch-release-${{ matrix.release.branch }}"
+      cancel-in-progress: false
     strategy:
       max-parallel: 1
       matrix:
         release: ${{ fromJson(needs.scan-release-branches.outputs.matrix) }}
     steps:
-    - name: Trigger Pipelines as Code
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Trigger and monitor Pipelines as Code
       env:
+        GH_TOKEN: ${{ github.token }}
         PAC_INCOMING_SECRET: ${{ secrets.PAC_INCOMING_SECRET }}
         RELEASE_BRANCH: ${{ matrix.release.branch }}
         RELEASE_VERSION: ${{ matrix.release.version }}
         RELEASE_AS_LATEST: ${{ matrix.release.release_as_latest }}
-      run: |
-        jq -n '{
-          repository: env.PAC_REPOSITORY_NAME,
-          branch: env.RELEASE_BRANCH,
-          pipelinerun: "release-patch",
-          secret: env.PAC_INCOMING_SECRET,
-          params: {
-            version: env.RELEASE_VERSION,
-            release_as_latest: env.RELEASE_AS_LATEST
-          }
-        }' | curl --fail-with-body --silent --show-error \
-          -H "Content-Type: application/json" \
-          --data-binary @- \
-          "${PAC_CONTROLLER_URL}/incoming"
+      run: bash ./hack/trigger-patch-release.sh
 
   trigger-manual-release:
     name: "Trigger ${{ inputs.version }} (${{ inputs.branch }})"
     if: github.event_name == 'workflow_dispatch' && github.repository_owner == 'tektoncd'
     runs-on: ubuntu-latest
+    timeout-minutes: 190
+    concurrency:
+      group: "patch-release-${{ inputs.branch }}"
+      cancel-in-progress: false
     steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
     - name: Validate inputs
       env:
         BRANCH: ${{ inputs.branch }}
@@ -167,23 +172,11 @@ jobs:
           exit 1
         fi
 
-    - name: Trigger Pipelines as Code
+    - name: Trigger and monitor Pipelines as Code
       env:
+        GH_TOKEN: ${{ github.token }}
         PAC_INCOMING_SECRET: ${{ secrets.PAC_INCOMING_SECRET }}
         RELEASE_BRANCH: ${{ inputs.branch }}
         RELEASE_VERSION: ${{ inputs.version }}
         RELEASE_AS_LATEST: ${{ inputs.release_as_latest }}
-      run: |
-        jq -n '{
-          repository: env.PAC_REPOSITORY_NAME,
-          branch: env.RELEASE_BRANCH,
-          pipelinerun: "release-patch",
-          secret: env.PAC_INCOMING_SECRET,
-          params: {
-            version: env.RELEASE_VERSION,
-            release_as_latest: env.RELEASE_AS_LATEST
-          }
-        }' | curl --fail-with-body --silent --show-error \
-          -H "Content-Type: application/json" \
-          --data-binary @- \
-          "${PAC_CONTROLLER_URL}/incoming"
+      run: bash ./hack/trigger-patch-release.sh

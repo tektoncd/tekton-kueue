@@ -90,6 +90,9 @@ jobs:
       - name: Run actionlint
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
+      - name: Test patch release monitoring
+        run: bash hack/trigger-patch-release_test.sh
+
   ci-summary:
     name: CI summary
     needs: [build, test, lint, e2e, dependency-review, workflow-lint]
