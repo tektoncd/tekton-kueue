@@ -111,6 +111,9 @@ jobs:
     needs: scan-release-branches
     if: needs.scan-release-branches.outputs.has_releases == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      checks: read
+      contents: write
     timeout-minutes: 190
     concurrency:
       group: "patch-release-${{ matrix.release.branch }}"
@@ -137,6 +140,9 @@ jobs:
     name: "Trigger ${{ inputs.version }} (${{ inputs.branch }})"
     if: github.event_name == 'workflow_dispatch' && github.repository_owner == 'tektoncd'
     runs-on: ubuntu-latest
+    permissions:
+      checks: read
+      contents: write
     timeout-minutes: 190
     concurrency:
       group: "patch-release-${{ inputs.branch }}"
