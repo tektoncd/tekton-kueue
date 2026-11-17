@@ -156,8 +156,21 @@ metadata:
 spec:
   clusterQueue: release-smoke
 YAML
+k get pods -n tekton-kueue -l app.kubernetes.io/name=tekton-kueue-webhook -o json \
+  > "$work/old-webhook-pods.json"
 k rollout restart deployment/tekton-kueue-webhook -n tekton-kueue
 k rollout status deployment/tekton-kueue-webhook -n tekton-kueue --timeout=300s
+# Deployment availability alone can precede removal of the old Service endpoint.
+# Watch the old Pods disappear and the endpoint switch before admission.
+while IFS= read -r pod; do
+  k wait --for=delete "pod/$pod" -n tekton-kueue --timeout=300s
+done < <(jq -r '.items[].metadata.name' "$work/old-webhook-pods.json")
+k get pods -n tekton-kueue -l app.kubernetes.io/name=tekton-kueue-webhook -o json \
+  > "$work/webhook-pods.json"
+pod=$(jq -er '[.items[] | select(.metadata.deletionTimestamp == null)] |
+  if length == 1 then .[0].metadata.name else error("expected one webhook Pod") end' "$work/webhook-pods.json")
+k wait --for=jsonpath='{.subsets[0].addresses[0].targetRef.name}'="$pod" \
+  endpoints/tekton-kueue-webhook-service -n tekton-kueue --timeout=120s
 k wait --for=condition=Active clusterqueue/release-smoke --timeout=120s
 k wait --for=condition=Active localqueue/pipelines-queue -n release-smoke --timeout=120s
 k create -f - -o json > "$artifacts/created-pipelinerun.json" <<'YAML'
