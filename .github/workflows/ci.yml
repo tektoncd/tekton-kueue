@@ -101,10 +101,12 @@ jobs:
         run: |
           bash -n hack/verify-release-artifacts.sh hack/verify-release-artifacts_test.sh \
             hack/smoke-release.sh hack/smoke-release_test.sh \
-            hack/finalize-release.sh hack/finalize-release_test.sh
+            hack/finalize-release.sh hack/finalize-release_test.sh \
+            hack/recover-release.sh hack/recover-release_test.sh
           bash hack/verify-release-artifacts_test.sh
           bash hack/smoke-release_test.sh
           bash hack/finalize-release_test.sh
+          bash hack/recover-release_test.sh
 
   ci-summary:
     name: CI summary

@@ -7,7 +7,7 @@ fail() {
   exit 1
 }
 
-[[ $# == 5 ]] || fail "usage: $0 VERSION EXPECTED_COMMIT RELEASE_ID PUBLIC_KEY_FILE OUTPUT_DIR"
+[[ $# == 5 ]] || fail "usage: $0 VERSION EXPECTED_COMMIT RELEASE_ID|bucket PUBLIC_KEY_FILE OUTPUT_DIR"
 version=$1
 commit=$2
 release_id=$3
@@ -19,7 +19,7 @@ source_url=https://github.com/tektoncd/tekton-kueue
 
 [[ $version =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "invalid version"
 [[ $commit =~ ^[0-9a-f]{40}$ ]] || fail "invalid commit"
-[[ $release_id =~ ^[1-9][0-9]*$ ]] || fail "invalid release ID"
+[[ $release_id == bucket || $release_id =~ ^[1-9][0-9]*$ ]] || fail "invalid release ID"
 [[ $repository =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$ &&
    ${repository##*/} != . && ${repository##*/} != .. ]] || fail "invalid GitHub repository"
 [[ -n ${GH_TOKEN:-} ]] || fail "GH_TOKEN is required"
@@ -42,22 +42,34 @@ fi
 
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-gh api --method GET "repos/$repository/releases/$release_id" > "$work/release.json"
-jq -e --arg version "$version" --arg commit "$commit" --arg id "$release_id" '
-  .id == ($id | tonumber) and .tag_name == $version and .target_commitish == $commit
-  and (.draft | type == "boolean") and (.assets | type == "array")
-  and ([.assets[] | select(.name == "release.yaml" or .name == "release.notags.yaml" or .name == "SHA256SUMS")]
-    | length == 3 and (map(.name) | unique | length == 3)
-    and all(.[]; (.id | type == "number") and .id > 0 and .id == (.id | floor))
-    and (map(.id) | unique | length == 3))
-' "$work/release.json" >/dev/null || fail "release metadata does not match candidate"
+receipt_id=$release_id
+if [[ $release_id == bucket ]]; then
+  receipt_id=null
+  printf '{"draft":null,"assets":[]}\n' > "$work/release.json"
+  for file in release.yaml release.notags.yaml SHA256SUMS; do
+    curl --fail --silent --show-error --location \
+      "https://infra.tekton.dev/tekton-releases/tekton-kueue/previous/$version/$file" \
+      --output "$work/$file"
+    [[ -s $work/$file ]] || fail "empty bucket artifact: $file"
+  done
+else
+  gh api --method GET "repos/$repository/releases/$release_id" > "$work/release.json"
+  jq -e --arg version "$version" --arg commit "$commit" --arg id "$release_id" '
+    .id == ($id | tonumber) and .tag_name == $version and .target_commitish == $commit
+    and (.draft | type == "boolean") and (.assets | type == "array")
+    and ([.assets[] | select(.name == "release.yaml" or .name == "release.notags.yaml" or .name == "SHA256SUMS")]
+      | length == 3 and (map(.name) | unique | length == 3)
+      and all(.[]; (.id | type == "number") and .id > 0 and .id == (.id | floor))
+      and (map(.id) | unique | length == 3))
+  ' "$work/release.json" >/dev/null || fail "release metadata does not match candidate"
 
-for file in release.yaml release.notags.yaml SHA256SUMS; do
-  asset_id=$(jq -r --arg name "$file" '.assets[] | select(.name == $name) | .id' "$work/release.json")
-  gh api --method GET -H "Accept: application/octet-stream" \
-    "repos/$repository/releases/assets/$asset_id" > "$work/$file"
-  [[ -s $work/$file ]] || fail "empty asset: $file"
-done
+  for file in release.yaml release.notags.yaml SHA256SUMS; do
+    asset_id=$(jq -r --arg name "$file" '.assets[] | select(.name == $name) | .id' "$work/release.json")
+    gh api --method GET -H "Accept: application/octet-stream" \
+      "repos/$repository/releases/assets/$asset_id" > "$work/$file"
+    [[ -s $work/$file ]] || fail "empty asset: $file"
+  done
+fi
 
 # Parse before hashing: never pass downloaded filenames to a checksum tool.
 declare -A seen=()
@@ -72,12 +84,14 @@ while IFS= read -r line || [[ -n $line ]]; do
   [[ ${actual%% *} == "$hash" ]] || fail "checksum mismatch: $file"
 done < "$work/SHA256SUMS"
 [[ ${#seen[@]} == 2 ]] || fail "SHA256SUMS must contain exactly the two manifests"
-for file in release.yaml release.notags.yaml SHA256SUMS; do
-  curl --fail --silent --show-error --location \
-    "https://infra.tekton.dev/tekton-releases/tekton-kueue/previous/$version/$file" \
-    --output "$work/bucket-$file"
-  cmp -s "$work/$file" "$work/bucket-$file" || fail "bucket mismatch: $file"
-done
+if [[ $release_id != bucket ]]; then
+  for file in release.yaml release.notags.yaml SHA256SUMS; do
+    curl --fail --silent --show-error --location \
+      "https://infra.tekton.dev/tekton-releases/tekton-kueue/previous/$version/$file" \
+      --output "$work/bucket-$file"
+    cmp -s "$work/$file" "$work/bucket-$file" || fail "bucket mismatch: $file"
+  done
+fi
 echo "PASS release metadata, checksums and bucket copies"
 
 # Kustomize emits block YAML with top-level metadata and scalar image fields.
@@ -164,7 +178,7 @@ jq -e -s --arg digest "${digest#sha256:}" --arg commit "$commit" '
   fail "no verified provenance matching source and digest"
 echo "PASS configured-key signature and SLSA provenance"
 
-jq -n --argjson release_id "$release_id" --arg version "$version" --arg commit "$commit" \
+jq -n --argjson release_id "$receipt_id" --arg version "$version" --arg commit "$commit" \
   --arg image "$image" --arg digest "$digest" --slurpfile release "$work/release.json" \
   '{release_id: $release_id, version: $version, commit: $commit, image: $image,
     digest: $digest, draft: $release[0].draft,

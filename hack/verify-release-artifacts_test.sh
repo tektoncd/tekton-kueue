@@ -69,6 +69,7 @@ cat > "$work/bin/fake" <<'EOF'
 set -euo pipefail
 case "${0##*/}" in
   gh)
+    [[ ${VERIFY_MODE:-123} != bucket ]] || exit 90
     [[ $1 == api && $2 == --method && $3 == GET ]] || exit 90
     if [[ $4 == repos/tektoncd/tekton-kueue/releases/123 ]]; then
       if [[ $SCENARIO == malformed-metadata ]]; then printf '{\n'; exit; fi
@@ -115,7 +116,9 @@ case "${0##*/}" in
     [[ $5 == "$prefix"* ]] || exit 90
     file=${5#"$prefix"}
     case "$file" in release.yaml|release.notags.yaml|SHA256SUMS) ;; *) exit 90 ;; esac
+    [[ $SCENARIO != "missing-bucket-$file" ]] || exit 22
     cat "$FIXTURES/$file" > "$7"
+    [[ $SCENARIO != "empty-bucket-$file" ]] || : > "$7"
     [[ $SCENARIO != "bucket-$file" ]] || printf '\nchanged\n' >> "$7"
     ;;
   crane)
@@ -191,7 +194,7 @@ done
 
 run_verifier() {
   bash "$root/hack/verify-release-artifacts.sh" \
-    "$VERSION" "$COMMIT" 123 "$work/key.pub" "$work/output"
+    "$VERSION" "$COMMIT" "${VERIFY_MODE:-123}" "$work/key.pub" "$work/output"
 }
 
 passed=0
@@ -235,6 +238,38 @@ for SCENARIO in success published build-config-source multiple-attestations arra
   passed=$((passed + 1))
 done
 
+export VERIFY_MODE=bucket
+for SCENARIO in success build-config-source signature-failure attestation-failure \
+  bad-source bad-commit bad-digest missing-platform bad-source-label \
+  wrong-image-repository inconsistent-image missing-webhook \
+  bucket-release.yaml bucket-release.notags.yaml bucket-SHA256SUMS \
+  missing-bucket-release.yaml missing-bucket-release.notags.yaml missing-bucket-SHA256SUMS \
+  empty-bucket-release.yaml empty-bucket-release.notags.yaml empty-bucket-SHA256SUMS; do
+  export SCENARIO
+  rm -rf "$work/output"
+  write_artifacts
+  status=0
+  run_verifier > "$work/log" 2>&1 || status=$?
+  case "$SCENARIO" in
+    success|build-config-source)
+      [[ $status == 0 ]] || { cat "$work/log" >&2; exit 1; }
+      jq -e --arg commit "$COMMIT" --arg image "$IMAGE" --arg version "$VERSION" \
+        --arg digest "sha256:$DIGEST" '
+        . == {release_id:null,version:$version,commit:$commit,image:$image,
+          digest:$digest,draft:null,assets:[]}' "$work/output/release-info.json" >/dev/null
+      for file in release.yaml release.notags.yaml SHA256SUMS; do
+        cmp "$FIXTURES/$file" "$work/output/$file"
+      done
+      ;;
+    *)
+      [[ $status != 0 && ! -e $work/output/release-info.json ]] || {
+        echo "unexpected bucket verification success: $SCENARIO" >&2; exit 1;
+      }
+      ;;
+  esac
+  passed=$((passed + 1))
+done
+unset VERIFY_MODE
 export SCENARIO=success
 expect_failure() {
   if "$@" > "$work/log" 2>&1; then

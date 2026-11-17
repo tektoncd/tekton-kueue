@@ -103,12 +103,38 @@ to complete that promotion without rebuilding it.
 Do not delete versioned artifacts to work around a partial release. Preserve
 them and their original source/signing evidence for recovery.
 
+## Recovering a partial draft
+
+Run **Recover Release Draft** on `main` with the approved version, full source
+commit and image digest. It uses the same protected environment, independent
+signing key and robot credential as finalization. It can create a missing draft
+or attach missing files to an existing draft without rebuilding.
+
+Recovery requires a complete, signed versioned bucket bundle: `release.yaml`,
+`release.notags.yaml` and `SHA256SUMS`. It verifies the bundle and provenance
+before any draft mutation. Existing tags must resolve to the approved commit,
+and existing assets must match the verified bytes. Conflicting or published
+releases are rejected; matching assets and existing notes are preserved.
+After attaching only missing files, it verifies the recovered draft against
+the bucket again. Run **Finalize Release** separately to smoke-test and publish.
+
+An incomplete bucket bundle or missing signing evidence cannot be reconstructed
+safely by this workflow. It stops without rebuilding or deleting anything;
+preserve the state for an operator to recover the original artifacts.
+
+The release pipeline's authenticated preflight rejects any existing tag,
+draft, image or versioned object and directs operators to recovery. Its
+`github-token/GITHUB_TOKEN` namespace secret must belong to `tekton-robot` and
+have repository push permission, so draft lookup cannot silently miss drafts.
+Authentication, rate-limit and ambiguous registry/storage failures block staging.
+
 ## Developer checks
 
 ```sh
 bash hack/verify-release-artifacts_test.sh
 bash hack/smoke-release_test.sh
 bash hack/finalize-release_test.sh
+bash hack/recover-release_test.sh
 ```
 
 These deterministic boundary tests do not mutate GitHub, the registry or
