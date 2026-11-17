@@ -179,7 +179,7 @@ spec:
               command: ["/bin/echo", "release smoke"]
 YAML
 # The create response is the admission result, before controller updates.
-jq -e '.spec.status == "Pending"
+jq -e '.spec.status == "PipelineRunPending"
   and .metadata.labels["kueue.x-k8s.io/queue-name"] == "pipelines-queue"
   and .metadata.annotations["kueue.konflux-ci.dev/requests-cpu"] == "1"
   and (.metadata.uid | type == "string" and length > 0)

@@ -60,7 +60,7 @@ if [[ ${SMOKE_FAKE:-} == true ]]; then
         metadata:{uid:"smoke-uid",
           labels:{"kueue.x-k8s.io/queue-name":"pipelines-queue"},
           annotations:{"kueue.konflux-ci.dev/requests-cpu":(if $mode == "mutation" then "2" else "1" end)}},
-        spec:{status:"Pending"}}'
+        spec:{status:(if $mode == "wrong-pending" then "Pending" else "PipelineRunPending" end)}}'
       ;;
     get)
       if [[ $2 == workload/* ]]; then
@@ -172,7 +172,7 @@ run_case() {
 }
 
 for mode in digest mismatch malformed missing incomplete artifacts success success-again \
-  creation readiness mutation workload admission run cleanup; do
+  creation readiness mutation wrong-pending workload admission run cleanup; do
   run_case "$mode"
 done
 first=$(jq -r 'select(.command == "kind" and .args[0] == "create") | .args[] | select(startswith("release-smoke-"))' "$tmp/success/calls.jsonl")
