@@ -365,7 +365,7 @@ spec:
                     for uuid in ${CANDIDATES}; do
                       KIND=$(curl -fsS "${REKOR_HOST}/api/v1/log/entries/${uuid}" \
                         | jq -r '.[].body' | base64 -d 2>/dev/null | jq -r '.kind' 2>/dev/null || true)
-                      if [ "${KIND}" = "intoto" ]; then
+                      if [ "${KIND}" = "intoto" ] || [ "${KIND}" = "dsse" ]; then
                         REKOR_UUID="${uuid}"
                         break
                       fi
@@ -373,19 +373,8 @@ spec:
                   fi
 
                   if [ -z "${REKOR_UUID}" ]; then
-                    echo "WARNING: Could not find an in-toto attestation entry; falling back to the transparency annotation"
-                    TRANSPARENCY=$(kubectl get taskrun "${TASKRUN_NAME}" -n "${NAMESPACE}" \
-                      -o jsonpath='{.metadata.annotations.chains\.tekton\.dev/transparency}' 2>/dev/null || echo "")
-                    if [ -n "${TRANSPARENCY}" ]; then
-                      REKOR_UUID=$(curl -fsS "${TRANSPARENCY}" | jq -r 'keys[0] // empty' || true)
-                      if [ -z "${REKOR_UUID}" ]; then
-                        REKOR_UUID=$(echo "${TRANSPARENCY}" | grep -oE 'logIndex=[0-9]+' | cut -d= -f2)
-                      fi
-                    fi
-                  fi
-
-                  if [ -z "${REKOR_UUID}" ]; then
-                    REKOR_UUID="unknown"
+                    echo "ERROR: Could not find an intoto or dsse attestation entry for ${IMAGE_DIGEST}"
+                    exit 1
                   fi
                   echo "Rekor UUID: ${REKOR_UUID}"
                   printf '%s' "${REKOR_UUID}" > "$(results.rekor-uuid.path)"
@@ -491,7 +480,7 @@ spec:
           - name: url
             value: https://github.com/tektoncd/plumbing
           - name: revision
-            value: 894710e292fcb6b17276af01a2bc318107eef8a7
+            value: df071e78c5b1a58867435efc7a9b295688d58969
           - name: pathInRepo
             value: tekton/resources/release/base/github_release_oci.yaml
       params:
