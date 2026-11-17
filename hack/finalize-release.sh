@@ -138,6 +138,8 @@ jq --rawfile section "$work/attestation.md" --arg version "$version" --arg commi
   | .make_latest = $latest
 ' "$work/current-release.json" > "$work/patch.json"
 
+bash "$root/hack/verify-release-tag.sh" "$version" "$commit" "$(jq -r .draft "$work/current-release.json")"
+
 if [[ $latest == true ]]; then
   # Keep credentials out of the caller's Docker configuration and process args.
   export DOCKER_CONFIG="$work/docker"
@@ -181,6 +183,7 @@ jq -e --arg version "$version" --arg commit "$commit" --arg operation "$operatio
   .body == $patch[0].body and
   .draft == (if $operation == "repair" then $previous[0].draft else false end)
 ' "$work/result.json" >/dev/null || fail "GitHub did not retain the requested release state"
+bash "$root/hack/verify-release-tag.sh" "$version" "$commit" "$(jq -r .draft "$work/result.json")"
 if [[ $publish_latest == true ]]; then
   [[ $(gh api "repos/$repository/releases/latest" --jq .tag_name) == "$version" ]] ||
     fail "GitHub latest release does not match the finalized candidate"
