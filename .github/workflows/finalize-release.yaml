@@ -1,0 +1,118 @@
+name: Finalize Release
+
+"on":
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Publish a verified candidate or repair only its attestation notes
+        required: true
+        type: choice
+        options: [finalize, repair]
+      version:
+        description: Candidate version, for example v0.4.4
+        required: true
+        type: string
+      source_commit:
+        description: Full source commit approved for this release
+        required: true
+        type: string
+      release_id:
+        description: Existing GitHub release ID
+        required: true
+        type: string
+      image_digest:
+        description: Exact approved sha256 image digest
+        required: true
+        type: string
+      promote_latest:
+        description: Also promote the verified image and manifests to latest
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-finalization
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    if: github.repository == 'tektoncd/tekton-kueue' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment:
+      name: kueue-release-finalization
+    env:
+      GOTOOLCHAIN: local
+      GH_TOKEN: ${{ secrets.CHATOPS_TOKEN }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      OCI_API_KEY: ${{ secrets.OCI_API_KEY }}
+      OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+      OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+      OCI_REGION: ${{ secrets.OCI_REGION }}
+      RELEASE_SIGNING_PUBLIC_KEY: ${{ vars.RELEASE_SIGNING_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Require configured signing trust
+        shell: bash
+        run: |
+          test -n "$RELEASE_SIGNING_PUBLIC_KEY"
+          printf '%s\n' "$RELEASE_SIGNING_PUBLIC_KEY" > "$RUNNER_TEMP/release-signing.pub"
+          openssl pkey -pubin -in "$RUNNER_TEMP/release-signing.pub" -noout
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Install pinned verification tools
+        shell: bash
+        run: |
+          export GOBIN="$RUNNER_TEMP/release-tools"
+          mkdir -p "$GOBIN"
+          go install github.com/sigstore/cosign/v3/cmd/cosign@v3.0.6
+          go install github.com/google/go-containerregistry/cmd/crane@v0.20.6
+          go install sigs.k8s.io/kind@v0.32.0
+          printf '%s\n' "$GOBIN" >> "$GITHUB_PATH"
+
+      - name: Install pinned OCI client
+        if: inputs.promote_latest
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/oci-client"
+          "$RUNNER_TEMP/oci-client/bin/pip" install oci-cli==3.74.2
+          printf '%s\n' "$RUNNER_TEMP/oci-client/bin" >> "$GITHUB_PATH"
+
+      - name: Verify, smoke-test and finalize
+        shell: bash
+        env:
+          OPERATION: ${{ inputs.operation }}
+          VERSION: ${{ inputs.version }}
+          COMMIT: ${{ inputs.source_commit }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          DIGEST: ${{ inputs.image_digest }}
+          PROMOTE_LATEST: ${{ inputs.promote_latest }}
+        run: |
+          bash hack/finalize-release.sh "$OPERATION" "$VERSION" "$COMMIT" \
+            "$RELEASE_ID" "$DIGEST" "$RUNNER_TEMP/release-signing.pub" \
+            "$PROMOTE_LATEST" "$RUNNER_TEMP/release-finalization"
+          {
+            printf '### Release %s\n\n' "$VERSION"
+            printf -- '- Operation: %s\n' "$OPERATION"
+            printf -- '- Source: `%s`\n' "$COMMIT"
+            printf -- '- Image: `%s`\n' "$DIGEST"
+            printf -- '- Release: https://github.com/tektoncd/tekton-kueue/releases/tag/%s\n' "$VERSION"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save isolated smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-finalization/smoke
+          if-no-files-found: ignore
