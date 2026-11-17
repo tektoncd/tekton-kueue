@@ -276,6 +276,15 @@ EOF
           and ($e|index("smoke")) < ($e|index("patch"))
           and all(.[]; .event != "image-copy" and .event != "bucket-put" and .event != "login")'
       fi
+      if [[ $MODE == generated-notes ]]; then
+        # Recovery-generated notes must remain repairable after publication.
+        cp "$CASE_DIR/release.json" "$CASE_DIR/original.json"
+        mv "$CASE_DIR/work" "$CASE_DIR/first-work"
+        bash "$tmp/checkout/hack/finalize-release.sh" repair "$VERSION" "$COMMIT" 123 \
+          "$DIGEST" "$CASE_DIR/key.pub" false "$CASE_DIR/work" >> "$CASE_DIR/output" 2>&1
+        jq -e -s '.[0].body == .[1].body and .[0].draft == false' \
+          "$CASE_DIR/release.json" "$CASE_DIR/original.json" >/dev/null
+      fi
       ;;
     *)
       [[ $status != 0 ]] || { echo "unexpected success: $MODE" >&2; exit 1; }

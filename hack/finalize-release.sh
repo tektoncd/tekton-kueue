@@ -131,7 +131,7 @@ jq --rawfile section "$work/attestation.md" --arg version "$version" --arg commi
   | ($body | index("<!-- Any special upgrade notice")) as $end
   | {tag_name:$version,target_commitish:$commit,
      draft:(if $operation == "repair" then .draft else false end),
-     body:(if $start == null then $body + "\n\n" + $section
+     body:(if $start == null then $body + "\n\n" + $section + "<!-- Any special upgrade notice -->\n"
        elif $end == null or $end <= $start
        then error("unsupported release-note structure")
        else $body[0:$start] + $section + $body[$end:] end)}
