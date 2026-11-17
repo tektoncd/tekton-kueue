@@ -164,6 +164,9 @@ jq -e -s --arg digest "${digest#sha256:}" --arg commit "$commit" '
   fail "no verified provenance matching source and digest"
 echo "PASS configured-key signature and SLSA provenance"
 
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+bash "$root/hack/verify-release-tag.sh" "$version" "$commit" "$(jq -r '.draft != false' "$work/release.json")"
+
 jq -n --argjson release_id "$release_id" --arg version "$version" --arg commit "$commit" \
   --arg image "$image" --arg digest "$digest" --slurpfile release "$work/release.json" \
   '{release_id: $release_id, version: $version, commit: $commit, image: $image,
