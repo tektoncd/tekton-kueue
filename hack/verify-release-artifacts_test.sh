@@ -69,6 +69,19 @@ cat > "$work/bin/fake" <<'EOF'
 set -euo pipefail
 case "${0##*/}" in
   gh)
+    if [[ $* == "api --paginate --slurp repos/tektoncd/tekton-kueue/git/matching-refs/tags/$VERSION" ]]; then
+      [[ $SCENARIO != tag-api-failure ]] || exit 42
+      jq -n --arg version "$VERSION" --arg commit "$COMMIT" --arg scenario "$SCENARIO" '
+        if $scenario == "missing-tag" or $scenario == "published-missing-tag" then [[]]
+        else [[{ref:("refs/tags/" + $version),object:{
+          type:(if $scenario == "annotated-tag" or $scenario == "wrong-annotated-tag" then "tag" else "commit" end),
+          sha:(if $scenario == "wrong-tag" then "f"*40 else $commit end)}}]] end'
+      exit
+    elif [[ $* == "api repos/tektoncd/tekton-kueue/git/tags/$COMMIT" ]]; then
+      jq -n --arg commit "$COMMIT" --arg scenario "$SCENARIO" '
+        {object:{type:"commit",sha:(if $scenario == "wrong-annotated-tag" then "f"*40 else $commit end)}}'
+      exit
+    fi
     [[ ${VERIFY_MODE:-123} != bucket ]] || exit 90
     [[ $1 == api && $2 == --method && $3 == GET ]] || exit 90
     if [[ $4 == repos/tektoncd/tekton-kueue/releases/123 ]]; then
@@ -76,7 +89,7 @@ case "${0##*/}" in
       jq -n --arg version "$VERSION" --arg commit "$COMMIT" --arg scenario "$SCENARIO" '
         {id:123,tag_name:$version,target_commitish:$commit,draft:true,assets:[
           {id:11,name:"release.yaml"},{id:12,name:"release.notags.yaml"},{id:13,name:"SHA256SUMS"}]}
-        | if $scenario == "published" then .draft = false
+        | if $scenario == "published" or $scenario == "published-missing-tag" then .draft = false
           elif $scenario == "metadata-id" then .id = 124
           elif $scenario == "metadata-tag" then .tag_name = "v0.4.2"
           elif $scenario == "metadata-commit" then .target_commitish = "main"
@@ -199,6 +212,7 @@ run_verifier() {
 
 passed=0
 for SCENARIO in success published build-config-source multiple-attestations array-attestations \
+  annotated-tag missing-tag wrong-tag wrong-annotated-tag published-missing-tag tag-api-failure \
   checksum traversal absolute extra-checksum duplicate-checksum missing-checksum empty-checksum \
   bucket-release.yaml bucket-release.notags.yaml bucket-SHA256SUMS \
   malformed-metadata metadata-id metadata-tag metadata-commit metadata-draft metadata-assets \
@@ -213,7 +227,7 @@ for SCENARIO in success published build-config-source multiple-attestations arra
   status=0
   run_verifier > "$work/log" 2>&1 || status=$?
   case "$SCENARIO" in
-    success|published|build-config-source|multiple-attestations|array-attestations)
+    success|published|build-config-source|multiple-attestations|array-attestations|annotated-tag|missing-tag)
       if [[ $status != 0 ]]; then cat "$work/log" >&2; exit 1; fi
       for file in release.yaml release.notags.yaml SHA256SUMS; do
         cmp "$FIXTURES/$file" "$work/output/$file"
