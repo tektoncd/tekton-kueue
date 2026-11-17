@@ -46,12 +46,14 @@ if [[ ${SMOKE_FAKE:-} == true ]]; then
       ;;
     rollout)
       if [[ $MODE == readiness && $* == *"status deployment/tekton-kueue-webhook"* ]]; then exit 42; fi
+      if [[ $* == *"restart deployment/tekton-kueue-webhook"* ]]; then touch "$CASE_DIR/restarted"; fi
       ;;
     wait)
       [[ $* == *--timeout=* ]] || exit 95
       if [[ $MODE == run && $* == *condition=Succeeded* ]]; then exit 42; fi
       if [[ $MODE == admission && $* == *condition=Admitted* ]]; then exit 42; fi
       if [[ $MODE == workload && $* == *--for=create* ]]; then exit 42; fi
+      if [[ $MODE == endpoint && $* == *endpoints/tekton-kueue-webhook-service* ]]; then exit 42; fi
       ;;
     create)
       "$REAL_KUBECTL" label --local --overwrite -f - -o json fixture-validation=true \
@@ -63,7 +65,11 @@ if [[ ${SMOKE_FAKE:-} == true ]]; then
         spec:{status:(if $mode == "wrong-pending" then "Pending" else "PipelineRunPending" end)}}'
       ;;
     get)
-      if [[ $2 == workload/* ]]; then
+      if [[ $2 == pods && $* == *"-o json"* ]]; then
+        name=old-webhook
+        [[ ! -e $CASE_DIR/restarted ]] || name=new-webhook
+        jq -n --arg name "$name" '{items:[{metadata:{name:$name}}]}'
+      elif [[ $2 == workload/* ]]; then
         jq -n '{metadata:{ownerReferences:[{uid:"smoke-uid",kind:"PipelineRun",controller:true}]},
           spec:{queueName:"pipelines-queue",podSets:[{template:{spec:{containers:[
             {resources:{requests:{cpu:"1","tekton.dev/pipelineruns":"1"}}}
@@ -156,6 +162,8 @@ run_case() {
           and any(.[]; .args | index("--for=create"))
           and any(.[]; .args | index("--for=condition=Admitted"))
           and any(.[]; .args | index("--for=condition=Succeeded"))
+          and any(.[]; .args | index("pod/old-webhook"))
+          and any(.[]; .args | index("endpoints/tekton-kueue-webhook-service"))
           and any(.[]; .args | index("https://github.com/cert-manager/cert-manager/releases/download/v1.19.2/cert-manager.yaml"))
           and any(.[]; .args | index("https://github.com/kubernetes-sigs/kueue/releases/download/v0.16.6/manifests.yaml"))
           and any(.[]; .args | index("https://github.com/tektoncd/pipeline/releases/download/v1.15.0/release.yaml"))
@@ -172,7 +180,7 @@ run_case() {
 }
 
 for mode in digest mismatch malformed missing incomplete artifacts success success-again \
-  creation readiness mutation wrong-pending workload admission run cleanup; do
+  creation readiness mutation wrong-pending endpoint workload admission run cleanup; do
   run_case "$mode"
 done
 first=$(jq -r 'select(.command == "kind" and .args[0] == "create") | .args[] | select(startswith("release-smoke-"))' "$tmp/success/calls.jsonl")
