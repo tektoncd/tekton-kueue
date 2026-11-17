@@ -27,9 +27,6 @@ spec:
     - name: releaseBucket
       description: bucket where the release is stored
       default: tekton-releases
-    - name: releaseAsLatest
-      description: Whether to tag and publish this release as latest
-      default: "false"
     - name: platforms
       description: Linux platforms to publish
       default: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
@@ -163,7 +160,7 @@ spec:
         - name: imageRegistryUser
           value: $(params.imageRegistryUser)
         - name: releaseAsLatest
-          value: $(params.releaseAsLatest)
+          value: "false"
         - name: serviceAccountPath
           value: $(params.serviceAccountImagesPath)
         - name: platforms
@@ -206,41 +203,6 @@ spec:
         - name: replaceExistingFiles
           value: "true"
         - name: recursive
-          value: "true"
-
-    - name: publish-to-bucket-latest
-      runAfter: [publish-images]
-      when:
-        - input: "$(params.releaseAsLatest)"
-          operator: in
-          values: ["true"]
-      taskRef:
-        resolver: bundles
-        params:
-          - name: bundle
-            value: ghcr.io/tektoncd/catalog/upstream/tasks/oracle-cloud-storage-upload@sha256:f1dd28da10dfb72ebbb3a5258e9f1ba6bfe82ee587311d708a7be3207f69e5e6
-          - name: name
-            value: oracle-cloud-storage-upload
-          - name: kind
-            value: task
-      workspaces:
-        - name: credentials
-          workspace: release-secret
-        - name: source
-          workspace: workarea
-          subPath: bucket
-      params:
-        - name: path
-          value: $(params.versionTag)
-        - name: bucketName
-          value: $(params.releaseBucket)
-        - name: objectPrefix
-          value: $(params.repoName)/latest/
-        - name: replaceExistingFiles
-          value: "true"
-        - name: recursive
-          value: "true"
-        - name: deleteExtraFiles
           value: "true"
 
     - name: report-bucket
