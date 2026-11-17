@@ -42,6 +42,13 @@ if [[ ${FINALIZER_TEST_CHILD:-} == true ]]; then
         [[ $# == 3 && $2 == --jq && $3 == .login ]]
         event identity "$@"
         if [[ $MODE == wrong-actor ]]; then echo waveywaves; else echo tekton-robot; fi
+      elif [[ $1 == --paginate ]]; then
+        [[ $# == 3 && $2 == --slurp &&
+           $3 == "repos/tektoncd/tekton-kueue/git/matching-refs/tags/$VERSION" ]]
+        event tag
+        jq -n --arg version "$VERSION" --arg commit "$COMMIT" --arg mode "$MODE" '
+          [[{ref:("refs/tags/" + $version),object:{type:"commit",
+            sha:(if $mode == "changed-tag" then "f"*40 else $commit end)}}]]'
       elif [[ $1 == --method ]]; then
         [[ $# == 5 && $2 == PATCH &&
            $3 == repos/tektoncd/tekton-kueue/releases/123 && $4 == --input ]]
@@ -164,6 +171,7 @@ printf 'caller configuration\n' > "$tmp/caller-docker/config.json"
 cp "$tmp/caller-docker/config.json" "$tmp/caller-config-original"
 export DOCKER_CONFIG="$tmp/caller-docker"
 cp "$root/hack/finalize-release.sh" "$tmp/checkout/hack/"
+cp "$root/hack/verify-release-tag.sh" "$tmp/checkout/hack/"
 for name in verify-release-artifacts.sh smoke-release.sh; do
   cp "${BASH_SOURCE[0]}" "$tmp/checkout/hack/$name"
 done
@@ -345,6 +353,7 @@ run_case verifier-failure
 run_case smoke-failure
 run_case wrong-source
 run_case changed-assets
+run_case changed-tag
 run_case rekor-mismatch
 run_case older-latest
 run_case image-failure
