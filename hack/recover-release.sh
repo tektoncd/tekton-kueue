@@ -41,25 +41,7 @@ jq -e --arg digest "$digest" '.digest == $digest' "$work/verified/release-info.j
   fail "verified digest differs from approved candidate"
 
 check_tag() {
-  local object sha
-  gh api --paginate --slurp "repos/$repository/git/matching-refs/tags/$version" > "$work/refs.json"
-  jq -e --arg ref "refs/tags/$version" '
-    [.[][] | select(.ref == $ref)] | length <= 1
-  ' "$work/refs.json" >/dev/null || fail "ambiguous tag"
-  object=$(jq -c --arg ref "refs/tags/$version" '
-    [.[][] | select(.ref == $ref)][0].object // null' "$work/refs.json")
-  while [[ $object != null ]]; do
-    sha=$(jq -r .sha <<< "$object")
-    [[ $sha =~ ^[0-9a-f]{40}$ ]] || fail "invalid tag object"
-    case $(jq -r .type <<< "$object") in
-      commit) [[ $sha == "$commit" ]] || fail "tag points to another source"; return ;;
-      tag)
-        gh api "repos/$repository/git/tags/$sha" > "$work/tag.json"
-        object=$(jq -ce '.object' "$work/tag.json")
-        ;;
-      *) fail "tag does not resolve to a commit" ;;
-    esac
-  done
+  bash "$root/hack/verify-release-tag.sh" "$version" "$commit" true
 }
 
 find_release() {

@@ -122,6 +122,7 @@ tmp=$(mktemp -d)
 trap 'status=$?; if [[ $status == 0 ]]; then rm -rf "$tmp"; else echo "test artifacts: $tmp" >&2; fi' EXIT
 mkdir -p "$tmp/checkout/hack" "$tmp/bin"
 cp "$root/hack/recover-release.sh" "$tmp/checkout/hack/"
+cp "$root/hack/verify-release-tag.sh" "$tmp/checkout/hack/"
 cp "${BASH_SOURCE[0]}" "$tmp/checkout/hack/verify-release-artifacts.sh"
 cp "${BASH_SOURCE[0]}" "$tmp/bin/gh"
 chmod +x "$tmp/bin/gh"
