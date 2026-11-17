@@ -104,8 +104,8 @@ jobs:
           {
             printf '### Release %s\n\n' "$VERSION"
             printf -- '- Operation: %s\n' "$OPERATION"
-            printf -- '- Source: `%s`\n' "$COMMIT"
-            printf -- '- Image: `%s`\n' "$DIGEST"
+            printf -- '- Source: %s\n' "$COMMIT"
+            printf -- '- Image: %s\n' "$DIGEST"
             printf -- '- Release: https://github.com/tektoncd/tekton-kueue/releases/tag/%s\n' "$VERSION"
           } >> "$GITHUB_STEP_SUMMARY"
 
