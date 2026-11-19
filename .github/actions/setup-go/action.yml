@@ -1,0 +1,13 @@
+name: Setup Go
+description: Install the Go toolchain declared in go.mod.
+
+# Single place where the actions/setup-go digest is pinned. Workflows
+# reference this action instead of pinning the digest themselves, so a
+# bump only has to happen once. Requires the repository to be checked
+# out already, since this is a local composite action.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5 # v7.1.0
+      with:
+        go-version-file: go.mod
