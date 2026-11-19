@@ -32,7 +32,6 @@ import (
 	"k8s.io/klog/v2"
 	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -42,7 +41,7 @@ import (
 // (e.g. taskRunTemplate: {}) into the admission response. Such leaks block
 // downstream webhooks (Tekton's) from applying their own defaults.
 // See https://github.com/konflux-ci/tekton-kueue/issues/319
-func SetupPipelineRunWebhookWithManager(mgr ctrl.Manager, defaulter admission.CustomDefaulter) error {
+func SetupPipelineRunWebhookWithManager(mgr ctrl.Manager, defaulter admission.Defaulter[runtime.Object]) error {
 	inner := admission.WithCustomDefaulter(mgr.GetScheme(), &tekv1.PipelineRun{}, defaulter)
 	handler := &patchFilteringWebhook{inner: inner}
 	mgr.GetWebhookServer().Register(
@@ -137,14 +136,14 @@ type pipelineRunCustomDefaulter struct {
 	configStore *ConfigStore
 }
 
-func NewCustomDefaulter(configStore *ConfigStore) (webhook.CustomDefaulter, error) {
+func NewCustomDefaulter(configStore *ConfigStore) (admission.Defaulter[runtime.Object], error) {
 	defaulter := &pipelineRunCustomDefaulter{
 		configStore: configStore,
 	}
 	return defaulter, nil
 }
 
-// Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind PipelineRun.
+// Default implements admission.Defaulter so a webhook will be registered for the Kind PipelineRun.
 func (d *pipelineRunCustomDefaulter) Default(ctx context.Context, obj runtime.Object) error {
 	plr, ok := obj.(*tekv1.PipelineRun)
 

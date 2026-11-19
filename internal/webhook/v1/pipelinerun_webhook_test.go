@@ -32,7 +32,6 @@ import (
 	admissionv1 "k8s.io/api/admission/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -43,7 +42,7 @@ func TestV1Webhook(t *testing.T) {
 
 var _ = Describe("PipelineRun Webhook", func() {
 	var (
-		defaulter webhook.CustomDefaulter
+		defaulter admission.Defaulter[k8sruntime.Object]
 		plr       *tektondevv1.PipelineRun
 	)
 

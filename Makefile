@@ -95,6 +95,10 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
+.PHONY: golangci-lint-version
+golangci-lint-version: ## Print the golangci-lint version pinned in .golangci.yml
+	@echo $(GOLANGCI_LINT_VERSION)
+
 ##@ Build
 
 .PHONY: build
@@ -204,7 +208,8 @@ CONTROLLER_TOOLS_VERSION ?= v0.17.1
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
-GOLANGCI_LINT_VERSION ?= v2.7.2
+# Parsed from the marker comment in .golangci.yml so the pin lives in one place.
+GOLANGCI_LINT_VERSION ?= $(shell sed -n 's/^.*golangci-lint-version: *//p' $(CURDIR)/.golangci.yml | head -1)
 KUEUE_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/kueue)
 TEKTON_VERSION ?= $(shell go list -m -f "{{ .Version }}" github.com/tektoncd/pipeline)
 CERT_MANAGER_VERSION ?= v1.19.2

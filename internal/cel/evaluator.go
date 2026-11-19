@@ -172,7 +172,7 @@ func convertSingleMutation(val interface{}) (*MutationRequest, error) {
 		return nil, err
 	}
 
-	key, err := extractStringField(mapVal, "key")
+	key, err := extractStringField(mapVal, fieldKey)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func convertSingleMutation(val interface{}) (*MutationRequest, error) {
 		return nil, fmt.Errorf("'key' field cannot be empty")
 	}
 
-	value, err := extractStringField(mapVal, "value")
+	value, err := extractStringField(mapVal, fieldValue)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func convertSingleMutation(val interface{}) (*MutationRequest, error) {
 
 // extractMutationType extracts and validates the mutation type from a map
 func extractMutationType(mapVal map[string]interface{}) (MutationType, error) {
-	typeVal, exists := mapVal["type"]
+	typeVal, exists := mapVal[fieldType]
 	if !exists {
 		return "", fmt.Errorf("missing required 'type' field")
 	}

@@ -1,3 +1,9 @@
+# Single source of truth for the golangci-lint binary version. The Makefile
+# parses this marker and the lint workflow reads it back via
+# `make golangci-lint-version`, so the pin only lives here.
+# The "version" key below is the config schema version, not the binary version.
+# renovate: datasource=github-releases depName=golangci/golangci-lint
+# golangci-lint-version: v2.15.0
 version: "2"
 run:
   allow-parallel-runners: true
@@ -22,6 +28,10 @@ linters:
     - unparam
     - unused
   settings:
+    goconst:
+      # Repeated literals in table-driven tests are fixture data, not
+      # constants worth extracting.
+      ignore-tests: true
     revive:
       rules:
         - name: comment-spacings

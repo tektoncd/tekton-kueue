@@ -128,6 +128,11 @@ func (p *PipelineRun) Stop(ctx context.Context, c client.Client, _ []podset.PodS
 	plrCopy := plr.DeepCopy()
 	plrCopy.SetManagedFields(nil)
 	plrCopy.Spec.Status = tekv1.PipelineRunSpecStatusStoppedRunFinally
+	// nolint:staticcheck // SA1019: the replacement client.Client.Apply takes a
+	// runtime.ApplyConfiguration, and Tekton does not generate apply
+	// configurations for PipelineRun. Migrating needs an unstructured apply
+	// configuration, which is a behavioural change to the stop path and is
+	// tracked separately.
 	err := c.Patch(ctx, plrCopy, client.Apply, client.FieldOwner(ControllerName), client.ForceOwnership)
 	if err != nil {
 		return false, err
