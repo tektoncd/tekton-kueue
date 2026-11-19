@@ -69,6 +69,11 @@
       "prPriority": 10
     },
     {
+      "description": "Group GitHub Actions bumps into a single PR so pinned digests stay consistent across workflows",
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
+    },
+    {
       "description": "Dockerfile updates (except Go toolchain, auto-approved after CI passes)",
       "matchManagers": ["dockerfile"],
       "excludePackagePatterns": ["go-toolset"]
