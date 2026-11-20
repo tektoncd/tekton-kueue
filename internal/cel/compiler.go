@@ -121,9 +121,9 @@ func createMutationFunction(name string, mutationType MutationType, returnType *
 
 				// Create strongly-typed MutationRequest structure as map
 				mutationMap := map[string]interface{}{
-					"type":  string(mutationType),
-					"key":   key,
-					"value": value,
+					fieldType:  string(mutationType),
+					fieldKey:   key,
+					fieldValue: value,
 				}
 
 				return types.NewStringInterfaceMap(types.DefaultTypeAdapter, mutationMap)
@@ -180,9 +180,9 @@ func createResourceMutationFunction(name string, mutationType MutationType, retu
 				// Create strongly-typed MutationRequest structure as map
 				// Note: This mutation type creates annotations but with special summing behavior for duplicates
 				mutationMap := map[string]interface{}{
-					"type":  string(mutationType),
-					"key":   "kueue.konflux-ci.dev/requests-" + key,
-					"value": value,
+					fieldType:  string(mutationType),
+					fieldKey:   "kueue.konflux-ci.dev/requests-" + key,
+					fieldValue: value,
 				}
 
 				return types.NewStringInterfaceMap(types.DefaultTypeAdapter, mutationMap)
@@ -208,9 +208,9 @@ func createPriorityMutationFunction(name string, returnType *cel.Type) cel.EnvOp
 
 				// Create strongly-typed MutationRequest structure as map with hardcoded key
 				mutationMap := map[string]interface{}{
-					"type":  string(MutationTypeLabel),
-					"key":   "kueue.x-k8s.io/priority-class",
-					"value": value,
+					fieldType:  string(MutationTypeLabel),
+					fieldKey:   "kueue.x-k8s.io/priority-class",
+					fieldValue: value,
 				}
 
 				return types.NewStringInterfaceMap(types.DefaultTypeAdapter, mutationMap)
@@ -238,9 +238,9 @@ func createManagedByFunction(name string, returnType *cel.Type) cel.EnvOption {
 				}
 
 				mutationMap := map[string]interface{}{
-					"type":  string(MutationTypeManagedBy),
-					"key":   "managedBy",
-					"value": value,
+					fieldType:  string(MutationTypeManagedBy),
+					fieldKey:   MutationKeyManagedBy,
+					fieldValue: value,
 				}
 				return types.NewStringInterfaceMap(types.DefaultTypeAdapter, mutationMap)
 			}),
@@ -262,9 +262,9 @@ func createMultiKueueFunction(name string, returnType *cel.Type) cel.EnvOption {
 			returnType,
 			cel.FunctionBinding(func(args ...ref.Val) ref.Val {
 				mutationMap := map[string]interface{}{
-					"type":  string(MutationTypeMultiKueue),
-					"key":   "managedBy", // required by evaluator but unused — mutator hardcodes Spec.ManagedBy
-					"value": "",
+					fieldType:  string(MutationTypeMultiKueue),
+					fieldKey:   MutationKeyManagedBy, // required by evaluator but unused — mutator hardcodes Spec.ManagedBy
+					fieldValue: "",
 				}
 				return types.NewStringInterfaceMap(types.DefaultTypeAdapter, mutationMap)
 			}),
@@ -287,9 +287,9 @@ func createMultiKueueFunction(name string, returnType *cel.Type) cel.EnvOption {
 				}
 
 				mutationMap := map[string]interface{}{
-					"type":  string(MutationTypeMultiKueue),
-					"key":   "managedBy", // required by evaluator but unused — mutator hardcodes Spec.ManagedBy
-					"value": queueName,
+					fieldType:  string(MutationTypeMultiKueue),
+					fieldKey:   MutationKeyManagedBy, // required by evaluator but unused — mutator hardcodes Spec.ManagedBy
+					fieldValue: queueName,
 				}
 				return types.NewStringInterfaceMap(types.DefaultTypeAdapter, mutationMap)
 			}),
