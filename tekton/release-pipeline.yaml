@@ -27,9 +27,6 @@ spec:
     - name: releaseBucket
       description: bucket where the release is stored
       default: tekton-releases
-    - name: releaseAsLatest
-      description: Whether to tag and publish this release as latest
-      default: "false"
     - name: platforms
       description: Linux platforms to publish
       default: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
@@ -97,7 +94,7 @@ spec:
           - name: url
             value: https://github.com/tektoncd/plumbing
           - name: revision
-            value: 0dc3174db86dcfa70724eced275ba4c1b2e25e76
+            value: 39fbe8fe22b3336190d3f37fdb11c76eb2660419
           - name: pathInRepo
             value: tekton/resources/release/base/prerelease_checks_oci.yaml
       params:
@@ -107,6 +104,8 @@ spec:
           value: $(params.versionTag)
         - name: releaseBucket
           value: $(params.releaseBucket)/$(params.repoName)
+        - name: imageRepository
+          value: $(params.imageRegistry)/$(params.imageRegistryPath)
       workspaces:
         - name: source-to-release
           workspace: workarea
@@ -163,7 +162,7 @@ spec:
         - name: imageRegistryUser
           value: $(params.imageRegistryUser)
         - name: releaseAsLatest
-          value: $(params.releaseAsLatest)
+          value: "false"
         - name: serviceAccountPath
           value: $(params.serviceAccountImagesPath)
         - name: platforms
@@ -206,41 +205,6 @@ spec:
         - name: replaceExistingFiles
           value: "true"
         - name: recursive
-          value: "true"
-
-    - name: publish-to-bucket-latest
-      runAfter: [publish-images]
-      when:
-        - input: "$(params.releaseAsLatest)"
-          operator: in
-          values: ["true"]
-      taskRef:
-        resolver: bundles
-        params:
-          - name: bundle
-            value: ghcr.io/tektoncd/catalog/upstream/tasks/oracle-cloud-storage-upload@sha256:f1dd28da10dfb72ebbb3a5258e9f1ba6bfe82ee587311d708a7be3207f69e5e6
-          - name: name
-            value: oracle-cloud-storage-upload
-          - name: kind
-            value: task
-      workspaces:
-        - name: credentials
-          workspace: release-secret
-        - name: source
-          workspace: workarea
-          subPath: bucket
-      params:
-        - name: path
-          value: $(params.versionTag)
-        - name: bucketName
-          value: $(params.releaseBucket)
-        - name: objectPrefix
-          value: $(params.repoName)/latest/
-        - name: replaceExistingFiles
-          value: "true"
-        - name: recursive
-          value: "true"
-        - name: deleteExtraFiles
           value: "true"
 
     - name: report-bucket
@@ -365,7 +329,7 @@ spec:
                     for uuid in ${CANDIDATES}; do
                       KIND=$(curl -fsS "${REKOR_HOST}/api/v1/log/entries/${uuid}" \
                         | jq -r '.[].body' | base64 -d 2>/dev/null | jq -r '.kind' 2>/dev/null || true)
-                      if [ "${KIND}" = "intoto" ]; then
+                      if [ "${KIND}" = "intoto" ] || [ "${KIND}" = "dsse" ]; then
                         REKOR_UUID="${uuid}"
                         break
                       fi
@@ -373,19 +337,8 @@ spec:
                   fi
 
                   if [ -z "${REKOR_UUID}" ]; then
-                    echo "WARNING: Could not find an in-toto attestation entry; falling back to the transparency annotation"
-                    TRANSPARENCY=$(kubectl get taskrun "${TASKRUN_NAME}" -n "${NAMESPACE}" \
-                      -o jsonpath='{.metadata.annotations.chains\.tekton\.dev/transparency}' 2>/dev/null || echo "")
-                    if [ -n "${TRANSPARENCY}" ]; then
-                      REKOR_UUID=$(curl -fsS "${TRANSPARENCY}" | jq -r 'keys[0] // empty' || true)
-                      if [ -z "${REKOR_UUID}" ]; then
-                        REKOR_UUID=$(echo "${TRANSPARENCY}" | grep -oE 'logIndex=[0-9]+' | cut -d= -f2)
-                      fi
-                    fi
-                  fi
-
-                  if [ -z "${REKOR_UUID}" ]; then
-                    REKOR_UUID="unknown"
+                    echo "ERROR: Could not find an intoto or dsse attestation entry for ${IMAGE_DIGEST}"
+                    exit 1
                   fi
                   echo "Rekor UUID: ${REKOR_UUID}"
                   printf '%s' "${REKOR_UUID}" > "$(results.rekor-uuid.path)"
@@ -491,7 +444,7 @@ spec:
           - name: url
             value: https://github.com/tektoncd/plumbing
           - name: revision
-            value: 894710e292fcb6b17276af01a2bc318107eef8a7
+            value: df071e78c5b1a58867435efc7a9b295688d58969
           - name: pathInRepo
             value: tekton/resources/release/base/github_release_oci.yaml
       params:

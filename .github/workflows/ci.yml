@@ -90,9 +90,27 @@ jobs:
       - name: Run actionlint
         run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
 
+  release-automation:
+    name: Release automation tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check release verification, smoke and finalization
+        run: |
+          bash -n hack/verify-release-artifacts.sh hack/verify-release-artifacts_test.sh \
+            hack/smoke-release.sh hack/smoke-release_test.sh \
+            hack/finalize-release.sh hack/finalize-release_test.sh \
+            hack/recover-release.sh hack/recover-release_test.sh
+          bash hack/verify-release-artifacts_test.sh
+          bash hack/smoke-release_test.sh
+          bash hack/finalize-release_test.sh
+          bash hack/recover-release_test.sh
+
   ci-summary:
     name: CI summary
-    needs: [build, test, lint, e2e, dependency-review, workflow-lint]
+    needs: [build, test, lint, e2e, dependency-review, workflow-lint, release-automation]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -104,6 +122,7 @@ jobs:
           E2E_RESULT: ${{ needs.e2e.result }}
           DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
           WORKFLOW_LINT_RESULT: ${{ needs.workflow-lint.result }}
+          RELEASE_AUTOMATION_RESULT: ${{ needs.release-automation.result }}
         run: |
           results=(
             "build=${BUILD_RESULT}"
@@ -112,6 +131,7 @@ jobs:
             "e2e=${E2E_RESULT}"
             "dependency-review=${DEPENDENCY_REVIEW_RESULT}"
             "workflow-lint=${WORKFLOW_LINT_RESULT}"
+            "release-automation=${RELEASE_AUTOMATION_RESULT}"
           )
           failed=0
           for result in "${results[@]}"; do

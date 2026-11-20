@@ -1,0 +1,65 @@
+name: Recover Release Draft
+
+"on":
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing versioned candidate, for example v0.4.4
+        required: true
+        type: string
+      source_commit:
+        description: Full approved source commit
+        required: true
+        type: string
+      image_digest:
+        description: Exact approved sha256 image digest
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-finalization
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    if: github.repository == 'tektoncd/tekton-kueue' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: kueue-release-finalization
+    env:
+      GH_TOKEN: ${{ secrets.CHATOPS_TOKEN }}
+      RELEASE_SIGNING_PUBLIC_KEY: ${{ vars.RELEASE_SIGNING_PUBLIC_KEY }}
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require configured signing trust
+        run: |
+          test -n "$RELEASE_SIGNING_PUBLIC_KEY"
+          printf '%s\n' "$RELEASE_SIGNING_PUBLIC_KEY" > "$RUNNER_TEMP/release-signing.pub"
+          openssl pkey -pubin -in "$RUNNER_TEMP/release-signing.pub" -noout
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install pinned verification tools
+        run: |
+          export GOBIN="$RUNNER_TEMP/release-tools"
+          mkdir -p "$GOBIN"
+          go install github.com/sigstore/cosign/v3/cmd/cosign@v3.0.6
+          go install github.com/google/go-containerregistry/cmd/crane@v0.20.6
+          printf '%s\n' "$GOBIN" >> "$GITHUB_PATH"
+      - name: Verify and resume the existing draft
+        env:
+          VERSION: ${{ inputs.version }}
+          COMMIT: ${{ inputs.source_commit }}
+          DIGEST: ${{ inputs.image_digest }}
+        run: |
+          bash hack/recover-release.sh "$VERSION" "$COMMIT" "$DIGEST" \
+            "$RUNNER_TEMP/release-signing.pub" "$RUNNER_TEMP/release-recovery"
+          printf 'Recovered verified draft for %s. Run Finalize Release separately after approval.\n' \
+            "$VERSION" >> "$GITHUB_STEP_SUMMARY"

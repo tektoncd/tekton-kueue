@@ -1,0 +1,56 @@
+name: Released Artifact Smoke
+
+"on":
+  pull_request:
+    paths:
+      - ".github/workflows/release-smoke.yaml"
+      - ".github/workflows/finalize-release.yaml"
+      - "hack/*release*.sh"
+      - "tekton/publish.yaml"
+      - "tekton/release-pipeline.yaml"
+      - "test/release-smoke/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-smoke-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Install pinned Kind
+        run: |
+          GOTOOLCHAIN=local go install sigs.k8s.io/kind@v0.32.0
+      - name: Check smoke script behavior
+        run: |
+          bash -n hack/smoke-release.sh hack/smoke-release_test.sh
+          bash hack/smoke-release_test.sh
+      - name: Install and exercise the immutable release fixture
+        shell: bash
+        run: |
+          # A pinned public fixture tests installation, not the production trust bootstrap.
+          curl -fsSL https://infra.tekton.dev/tekton-releases/tekton-kueue/previous/v0.4.3/release.yaml \
+            -o "$RUNNER_TEMP/release.yaml"
+          printf '%s  %s\n' \
+            340e21dbed798284de3e665e816e02f29f024af0cd32efa3cc98bbb7f9830270 \
+            "$RUNNER_TEMP/release.yaml" | sha256sum -c -
+          bash hack/smoke-release.sh "$RUNNER_TEMP/release.yaml" \
+            ghcr.io/tektoncd/tekton-kueue@sha256:6d89cbd8b47cebebc1c05c9e45292433e755372db68e0b66d5dd68d6ede9cb17 \
+            "$RUNNER_TEMP/release-smoke"
+      - name: Save smoke diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-smoke-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-smoke
+          if-no-files-found: ignore
