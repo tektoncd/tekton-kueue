@@ -9,7 +9,7 @@ The automated steps below become operational only after the release Pipeline tra
 1. Confirm the target version, LTS designation, end-of-life date, and compatibility ranges with the maintainers.
 2. Confirm all intended changes are merged and their release-note blocks are complete.
 3. From a clean checkout of the candidate commit, run generation, lint, unit, and end-to-end checks.
-4. Run a release candidate with `releaseAsLatest=false` through the Tekton-controlled release Pipeline so it cannot update the `latest` image tag or artifacts.
+4. Stage the release candidate through the Tekton-controlled release Pipeline. It publishes only versioned images and artifacts; it cannot update `latest`.
 5. Verify both generated manifests reference only `ghcr.io/tektoncd/tekton-kueue` images by immutable digest.
 6. Install and upgrade the candidate on the supported Kubernetes, Tekton Pipelines, and Kueue versions.
 
@@ -23,7 +23,7 @@ The automated steps below become operational only after the release Pipeline tra
 ## Publish a patch release
 
 1. Cherry-pick an approved fix to the supported release branch.
-2. After the cherry-pick passes CI on the release branch, run the **Patch Release** GitHub workflow with the branch, next `vX.Y.Z` version, and whether it should update `latest`.
+2. After the cherry-pick passes CI on the release branch, run the **Patch Release** GitHub workflow with the branch and next `vX.Y.Z` version. This stages a draft and does not update `latest`.
 3. Monitor and verify the release as for an initial release.
 
 The scheduled patch workflow scans `release-v0.3.x` and newer for unreleased commits. Older release lines require manual dispatch. A release operator must still verify every resulting release before announcing it.
@@ -40,6 +40,11 @@ Verify and record:
 - successful clean installation and upgrade testing.
 
 Do not announce the release until every promised artifact is downloadable and independently verifiable.
+
+Staging does not authorize publication or promotion. Those actions require
+maintainer approval and verification of the finished release. Automated
+approval-gated finalization is a separate rollout; staging alone leaves the
+GitHub release as a draft and preserves the existing `latest` artifacts.
 
 ## After the release
 

@@ -11,11 +11,6 @@ name: Patch Release
         description: "Version to release (for example, v0.5.1)"
         required: true
         type: string
-      release_as_latest:
-        description: "Publish as latest release"
-        required: false
-        type: boolean
-        default: true
   schedule:
   - cron: "0 10 * * 4"
 
@@ -47,23 +42,6 @@ jobs:
       id: scan
       shell: bash
       run: |
-        latest_branch=""
-        latest_major=0
-        latest_minor=0
-        for ref in $(git branch -r --list 'origin/release-v*'); do
-          branch="${ref#origin/}"
-          if [[ "$branch" =~ ^release-v([0-9]+)\.([0-9]+)\.x$ ]]; then
-            major="${BASH_REMATCH[1]}"
-            minor="${BASH_REMATCH[2]}"
-            if [ "$major" -gt "$latest_major" ] || { [ "$major" -eq "$latest_major" ] && [ "$minor" -gt "$latest_minor" ]; }; then
-              latest_major=$major
-              latest_minor=$minor
-              latest_branch=$branch
-            fi
-          fi
-        done
-        echo "::notice::Latest release branch: ${latest_branch}"
-
         min_major="${MIN_RELEASE_VERSION%%.*}"
         min_minor="${MIN_RELEASE_VERSION##*.}"
         releases=()
@@ -93,9 +71,7 @@ jobs:
           fi
 
           next_version=$(echo "$last_tag" | awk -F. '{printf "%s.%s.%d", $1, $2, $3+1}')
-          is_latest=false
-          [ "$branch" = "$latest_branch" ] && is_latest=true
-          releases+=("{\"branch\":\"${branch}\",\"version\":\"${next_version}\",\"release_as_latest\":\"${is_latest}\"}")
+          releases+=("{\"branch\":\"${branch}\",\"version\":\"${next_version}\"}")
         done
 
         if [ ${#releases[@]} -eq 0 ]; then
@@ -133,7 +109,6 @@ jobs:
         PAC_INCOMING_SECRET: ${{ secrets.PAC_INCOMING_SECRET }}
         RELEASE_BRANCH: ${{ matrix.release.branch }}
         RELEASE_VERSION: ${{ matrix.release.version }}
-        RELEASE_AS_LATEST: ${{ matrix.release.release_as_latest }}
       run: bash ./hack/trigger-patch-release.sh
 
   trigger-manual-release:
@@ -184,5 +159,4 @@ jobs:
         PAC_INCOMING_SECRET: ${{ secrets.PAC_INCOMING_SECRET }}
         RELEASE_BRANCH: ${{ inputs.branch }}
         RELEASE_VERSION: ${{ inputs.version }}
-        RELEASE_AS_LATEST: ${{ inputs.release_as_latest }}
       run: bash ./hack/trigger-patch-release.sh
