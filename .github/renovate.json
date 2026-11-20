@@ -83,17 +83,22 @@
       "matchManagers": ["rpm-lockfile"]
     },
     {
-      "description": "Block kueue upgrades beyond 0.16.x — kueue v0.17+ drops v1beta1 API support entirely",
+      "description": "Pin kueue to 0.19.x to stay aligned with RHBOK 1.5, which ships kueue 0.19. Each kueue minor release may also change the jobframework GenericJob interface, so bumps need manual adaptation in internal/controller",
       "matchManagers": ["gomod"],
       "matchPackageNames": ["sigs.k8s.io/kueue"],
-      "allowedVersions": "<0.17.0"
+      "allowedVersions": "<0.20.0"
     },
     {
-      "description": "Block k8s library upgrades beyond 0.35.x — kueue v0.16.x is built against k8s 0.35 (apimachinery excluded, pulled to 0.36.x by pipeline v1.15.0)",
+      "description": "Block k8s library upgrades beyond 0.37.x — tektoncd/pipeline v1.18 is built against k8s 0.37",
       "matchManagers": ["gomod"],
       "matchPackagePatterns": ["^k8s\\.io/"],
-      "excludePackageNames": ["k8s.io/apimachinery"],
-      "allowedVersions": "<0.36.0"
+      "allowedVersions": "<0.38.0"
+    },
+    {
+      "description": "Hold kubeflow/trainer at v2.1.0 via the replace directive in go.mod. kueue 0.19.14 requires trainer v2.2.1, but v2.2.1 references corev1.PodStatusResult, which k8s 0.37 removed, so it cannot compile alongside tektoncd/pipeline v1.18. Drop the replace once kueue ships a release whose trainer dependency builds against k8s 0.37",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["github.com/kubeflow/trainer/v2"],
+      "enabled": false
     },
     {
       "groupName": "kind cluster tooling",

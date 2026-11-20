@@ -94,7 +94,7 @@ func SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 		ctx,
 		mgr.GetClient(),
 		mgr.GetFieldIndexer(),
-		mgr.GetEventRecorderFor("kueue-plr"),
+		mgr.GetEventRecorder("kueue-plr"),
 		// In v1beta2, WaitForPodsReady removed its Enable bool field — a non-nil
 		// pointer now means the feature is enabled. Pass nil to keep it disabled,
 		// matching the original v1beta1 behavior where Enable defaulted to false.
@@ -128,6 +128,11 @@ func (p *PipelineRun) Stop(ctx context.Context, c client.Client, _ []podset.PodS
 	plrCopy := plr.DeepCopy()
 	plrCopy.SetManagedFields(nil)
 	plrCopy.Spec.Status = tekv1.PipelineRunSpecStatusStoppedRunFinally
+	// nolint:staticcheck // SA1019: the replacement client.Client.Apply takes a
+	// runtime.ApplyConfiguration, and Tekton does not generate apply
+	// configurations for PipelineRun. Migrating needs an unstructured apply
+	// configuration, which is a behavioural change to the stop path and is
+	// tracked separately.
 	err := c.Patch(ctx, plrCopy, client.Apply, client.FieldOwner(ControllerName), client.ForceOwnership)
 	if err != nil {
 		return false, err
@@ -179,7 +184,7 @@ func (p *PipelineRun) Object() client.Object {
 // so we use a dummy container whose resource requests are derived from
 // annotations on the PipelineRun. This allows Kueue to account for resources
 // without needing to know the actual task pod specifications.
-func (p *PipelineRun) PodSets(_ context.Context) ([]kueue.PodSet, error) {
+func (p *PipelineRun) PodSets(_ context.Context, _ client.Client) ([]kueue.PodSet, error) {
 	requests, err := p.resourcesRequests()
 	if err != nil {
 		return nil, err
@@ -275,17 +280,17 @@ func (p *PipelineRun) parseResourcesRequestsAnnotation(k, v string) (*corev1.Res
 // This method is never called because the WaitForPodsReady configuration is
 // not enabled for PipelineRuns. Kueue tracks pod readiness for batch Jobs,
 // but PipelineRuns manage their own pod lifecycle through Tekton.
-func (p *PipelineRun) PodsReady(_ context.Context) bool {
+func (p *PipelineRun) PodsReady(_ context.Context, _ client.Client, _ ...jobframework.PodsReadyOption) bool {
 	panic("pods ready shouldn't be called")
 }
 
 // RestorePodSetsInfo implements jobframework.GenericJob.
-func (p *PipelineRun) RestorePodSetsInfo(podSetsInfo []podset.PodSetInfo) bool {
+func (p *PipelineRun) RestorePodSetsInfo(_ context.Context, podSetsInfo []podset.PodSetInfo) bool {
 	return false
 }
 
 // RunWithPodSetsInfo implements jobframework.GenericJob.
-func (p *PipelineRun) RunWithPodSetsInfo(_ context.Context, podSetsInfo []podset.PodSetInfo) error {
+func (p *PipelineRun) RunWithPodSetsInfo(_ context.Context, _ client.Client, podSetsInfo []podset.PodSetInfo) error {
 	p.Spec.Status = ""
 	return nil
 }
