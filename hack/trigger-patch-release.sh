@@ -7,7 +7,6 @@ set -euo pipefail
 : "${PAC_CONTROLLER_URL:?}"
 : "${PAC_INCOMING_SECRET:?}"
 : "${PAC_REPOSITORY_NAME:?}"
-: "${RELEASE_AS_LATEST:?}"
 : "${RELEASE_BRANCH:?}"
 : "${RELEASE_VERSION:?}"
 
@@ -23,8 +22,7 @@ jq -n '{
   pipelinerun: "release-patch",
   secret: env.PAC_INCOMING_SECRET,
   params: {
-    version: env.RELEASE_VERSION,
-    release_as_latest: env.RELEASE_AS_LATEST
+    version: env.RELEASE_VERSION
   }
 }' | curl --fail-with-body --silent --show-error \
   -H "Content-Type: application/json" \
@@ -97,7 +95,8 @@ draft_url=$(jq -r '.html_url' <<<"$draft")
   echo
   echo "- External PipelineRun: ${details_url}"
   echo "- Draft release: ${draft_url}"
-  echo "- Publication: manual review required"
+  echo "- Finalization: approval, artifact verification, and installation smoke test required"
+  echo "- Latest image and bucket promotion: disabled during staging"
 } >> "$GITHUB_STEP_SUMMARY"
 
-echo "::warning title=Draft release awaiting publication::Review and publish ${draft_url}"
+echo "::warning title=Draft release awaiting finalization::Review ${draft_url}; publication and latest promotion require separate approval"
