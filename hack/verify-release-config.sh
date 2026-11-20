@@ -25,12 +25,33 @@ test -n "$go_image"
 grep -Fq "apk add --no-cache bash make" "$root/tekton/publish.yaml"
 grep -Fq 'org.opencontainers.image.source=https://$PACKAGE' "$root/tekton/publish.yaml"
 grep -Fq 'org.opencontainers.image.url=https://$PACKAGE' "$root/tekton/publish.yaml"
+if grep -Fq '/latest/' "$root/tekton/release-pipeline.yaml" ||
+   grep -Eq 'crane (cp|copy|tag).*latest' "$root/tekton/publish.yaml" ||
+   grep -Fq '$(params.releaseAsLatest)' "$root/tekton/release-pipeline.yaml"; then
+  echo "release staging must not promote latest" >&2
+  exit 1
+fi
+for caller in "$root/.tekton/release.yaml" "$root/.tekton/release-patch.yaml"; do
+  if grep -Fq 'name: releaseAsLatest' "$caller"; then
+    echo "release entry points must not accept latest promotion" >&2
+    exit 1
+  fi
+done
 
 "$container_tool" run --rm --platform "$platform" \
   -v "$root:/workspace/source" \
   "$publish_image" sh -ec '
     apk add --no-cache bash make >/dev/null
     cd /workspace/source
+    # Exercise the shipped guard, not a copy of its condition.
+    awk '\''
+      $0 == "  - name: publish-image-and-manifests" { step = 1 }
+      step && $0 == "    script: |" { script = 1; next }
+      script { sub(/^      /, ""); print }
+    '\'' tekton/publish.yaml > /tmp/publish.sh
+    status=0
+    VERSION_TAG=v0.0.0 RELEASE_AS_LATEST=true sh /tmp/publish.sh || status=$?
+    test "$status" -eq 64
     make release \
       KUSTOMIZE=/go/bin/kustomize \
       RELEASE_DIR=/tmp/release \

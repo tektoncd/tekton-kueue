@@ -43,8 +43,6 @@ spec:
     value: tekton-robot
   - name: releaseBucket
     value: tekton-releases
-  - name: releaseAsLatest
-    value: "{{ release_as_latest }}"
   - name: platforms
     value: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
   - name: serviceAccountImagesPath

@@ -31,7 +31,8 @@ spec:
   - name: imageRegistryUser
     default: tekton-robot
   - name: releaseAsLatest
-    default: "true"
+    description: Must be false; latest promotion belongs to release finalization.
+    default: "false"
   - name: platforms
     default: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le
   - name: serviceAccountPath
@@ -90,16 +91,16 @@ spec:
       #!/usr/bin/env sh
       set -eu
 
-      apk add --no-cache bash make
-
       printf '%s\n' "$VERSION_TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || {
         echo "invalid release version: $VERSION_TAG" >&2
         exit 1
       }
       case "$RELEASE_AS_LATEST" in
-        true|false) ;;
-        *) echo "releaseAsLatest must be true or false" >&2; exit 1 ;;
+        false) ;;
+        *) echo "latest promotion requires the release finalization workflow" >&2; exit 64 ;;
       esac
+
+      apk add --no-cache bash make
 
       OUTPUT_RELEASE_DIR="$OUTPUT_ROOT/$VERSION_TAG"
       git config --global --add safe.directory "$PROJECT_ROOT"
@@ -139,15 +140,3 @@ spec:
         *) echo "unexpected release image: $image" >&2; exit 1 ;;
       esac
       printf '%s,' "$image" > "$(results.IMAGES.path)"
-
-  - name: tag-latest
-    image: cgr.dev/chainguard/crane:latest-dev@sha256:dd9a345764e47517b80391648020b78c0ae6d4db0e392c7013b71e3817ed544c
-    script: |
-      #!/bin/sh
-      set -eu
-
-      [ "$RELEASE_AS_LATEST" = "true" ] || exit 0
-      mkdir -p "$HOME/.docker"
-      cp /workspace/docker-config.json "$HOME/.docker/config.json"
-      image=$(cat /workspace/built-images)
-      crane cp "$image" "${image%@*}:latest"
