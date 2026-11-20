@@ -18,6 +18,19 @@ const (
 	MutationTypeMultiKueue MutationType = "multiKueue"
 )
 
+// MutationKeyManagedBy is the key that managedBy and multiKueue mutation
+// requests must carry. It happens to match MutationTypeManagedBy, but it
+// denotes the request key rather than the mutation type.
+const MutationKeyManagedBy = "managedBy"
+
+// Field names of the map representation of a MutationRequest exchanged
+// between the CEL functions and the evaluator.
+const (
+	fieldType  = "type"
+	fieldKey   = "key"
+	fieldValue = "value"
+)
+
 // IsValid checks if the mutation type is valid
 func (mt MutationType) IsValid() bool {
 	return slices.Contains(ValidTypes(), mt)
@@ -72,8 +85,8 @@ func (mr *MutationRequest) Validate() error {
 	if mr.Value == "" && mr.Type != MutationTypeMultiKueue {
 		return fmt.Errorf("mutation value cannot be empty")
 	}
-	if mr.Type == MutationTypeManagedBy && mr.Key != "managedBy" {
-		return fmt.Errorf("managedBy mutation must use key %q, got %q", "managedBy", mr.Key)
+	if mr.Type == MutationTypeManagedBy && mr.Key != MutationKeyManagedBy {
+		return fmt.Errorf("managedBy mutation must use key %q, got %q", MutationKeyManagedBy, mr.Key)
 	}
 	return nil
 }
